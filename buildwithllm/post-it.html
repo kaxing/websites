@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Post-It Notes</title>
+<style>
+  body { font-family: Arial, sans-serif; background-color: #f5f5f5; margin: 0; }
+  .post-it { width: 200px; height: 200px; border: 1px solid #ccc; box-shadow: 0 0 5px rgba(0, 0, 0, 0.1); position: absolute; cursor: move; border-radius: 8px; display: flex; flex-direction: column; }
+  .header { padding: 5px; cursor: move; color: #333; font-weight: bold; text-align: center; border-radius: 6px 6px 0 0; flex-shrink: 0; background: inherit; overflow: hidden; max-height: 15%; display: flex; align-items: center; justify-content: center; }
+  .header input { width: 100%; border: none; background: inherit; text-align: center; font-weight: bold; color: #333; outline: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+  .header input.editing { cursor: text; }
+  textarea { flex-grow: 1; border: none; outline: none; resize: none; font-family: Arial, sans-serif; padding: 5px; border-radius: 0 0 8px 8px; background: inherit; }
+  button { margin: 20px; padding: 10px 20px; background: #5dade2; color: white; border: none; cursor: pointer; border-radius: 5px; }
+  button:hover { background: #5499c7; }
+  .reset-button { position: fixed; top: 7px; right: 7px; width: 37px; height: 37px; background: #ff9999; color: white; border: none; border-radius: 50%; cursor: pointer; font-size: 24px; display: flex; align-items: center; justify-content: center; }
+  .reset-button:hover { background: #ff6666; }
+  .trash-can { position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px; background: #ccc; color: white; border: none; border-radius: 50%; cursor: pointer; font-size: 24px; display: flex; align-items: center; justify-content: center; }
+  .trash-can:hover { background: #aaa; }
+  .confirm-dialog { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); display: none; z-index: 1000; border-radius: 8px; }
+  .confirm-dialog button { margin: 0 10px; }
+</style>
+</head>
+<body>
+<button id="add-note">Add Post-It</button>
+<button class="reset-button" title="Clear All Notes">⟳</button>
+<div class="trash-can" title="Drag notes here to delete">🗑️</div>
+<div class="confirm-dialog" id="confirm-dialog">
+  <p>Are you sure you want to clear all notes?</p>
+  <button id="confirm-yes">Yes</button>
+  <button id="confirm-no">No</button>
+</div>
+<script>
+  const zIndex = { value: 1 }, colors = ['#fffae6', '#ffe6e6', '#e6ffe6', '#e6f2ff', '#fff5e6']; let lastLeft = 50, lastTop = 50;
+  document.getElementById('add-note').addEventListener('click', () => { const note = createPostIt('', 'Post-It', `${lastLeft}px`, `${lastTop}px`, getRandomColor()); document.body.appendChild(note); saveNotes(); lastLeft += 10; lastTop += 10; });
+  document.querySelector('.reset-button').addEventListener('click', () => { document.getElementById('confirm-dialog').style.display = 'block'; });
+  document.getElementById('confirm-yes').addEventListener('click', () => { localStorage.removeItem('notes'); document.querySelectorAll('.post-it').forEach(note => note.remove()); document.getElementById('confirm-dialog').style.display = 'none'; });
+  document.getElementById('confirm-no').addEventListener('click', () => { document.getElementById('confirm-dialog').style.display = 'none'; });
+  function createPostIt(content, title, left, top, color) {
+    const postIt = document.createElement('div'); postIt.className = 'post-it'; postIt.style.zIndex = zIndex.value++; postIt.style.left = left; postIt.style.top = top; postIt.style.backgroundColor = color; postIt.innerHTML = `
+      <div class="header" style="background-color: ${color};">
+        <input type="text" value="${title}" placeholder="Click to edit title" readonly ondblclick="this.readOnly=false; this.classList.add('editing'); this.focus();" onblur="this.readOnly=true; this.classList.remove('editing');" />
+      </div>
+      <textarea>${content}</textarea>
+    `; const input = postIt.querySelector('input'); input.addEventListener('input', saveNotes); const textarea = postIt.querySelector('textarea'); textarea.addEventListener('input', saveNotes); makeDraggable(postIt); return postIt;
+  }
+  function makeDraggable(element) {
+    const header = element.querySelector('.header'); let trashCan = document.querySelector('.trash-can');
+    header.addEventListener('mousedown', (e) => {
+      element.style.zIndex = zIndex.value++; const offsetX = e.clientX - element.offsetLeft, offsetY = e.clientY - element.offsetTop;
+      const onMouseMove = (e) => {
+        element.style.left = `${e.clientX - offsetX}px`; element.style.top = `${e.clientY - offsetY}px`;
+        trashCan.style.backgroundColor = isTouchingTrashCan(element, trashCan) ? '#ff6666' : '#ccc';
+      };
+      const onMouseUp = () => {
+        document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp);
+        if (isTouchingTrashCan(element, trashCan)) { element.remove(); saveNotes(); } trashCan.style.backgroundColor = '#ccc'; saveNotes();
+      };
+      document.addEventListener('mousemove', onMouseMove); document.addEventListener('mouseup', onMouseUp);
+    });
+  }
+  function isTouchingTrashCan(element, trashCan) {
+    const elementRect = element.getBoundingClientRect(), trashCanRect = trashCan.getBoundingClientRect();
+    return !(elementRect.top > trashCanRect.bottom || elementRect.bottom < trashCanRect.top || elementRect.left > trashCanRect.right || elementRect.right < trashCanRect.left);
+  }
+  function saveNotes() {
+    const notes = Array.from(document.querySelectorAll('.post-it')).map(postIt => ({
+      content: postIt.querySelector('textarea').value, title: postIt.querySelector('input').value, left: postIt.style.left, top: postIt.style.top, color: postIt.style.backgroundColor,
+    }));
+    localStorage.setItem('notes', JSON.stringify(notes));
+  }
+  function loadNotes() {
+    const notes = JSON.parse(localStorage.getItem('notes') || '[]');
+    notes.forEach(({ content, title, left, top, color }) => { const note = createPostIt(content, title, left, top, color); document.body.appendChild(note); });
+  }
+  function getRandomColor() { return colors[Math.floor(Math.random() * colors.length)]; }
+  loadNotes();
+</script>
+</body>
+</html>
