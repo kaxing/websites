@@ -16,8 +16,8 @@
         .hint { position: absolute; top: 15%; left: 7%; font-size: 18px; z-index: 0; }
         @media (max-width: 768px) {
             body::before {
-                content: "This web is not optimized for mobile devices yet. Please check on your computer. Sorry for the inconvenience.";
-                position: absolute; top: 25px; left: 50%; transform: translateX(-50%);
+                content: "This web site is not optimized for mobile devices yet. Please open from your computer. Sorry for the inconvenience. Thank you.";
+                position: absolute; top: 35px; left: 50%; transform: translateX(-50%);
                 background-color: #ffebcc; padding: 10px; font-size: 14px; color: #333;
                 border: 1px solid #ffd580; border-radius: 5px; z-index: 999; text-align: center;
             }
@@ -29,16 +29,22 @@
     <div class="container">
         <div class="sidebar">
             <div class="section">Tools</div>
-            <a href="./post-it.html" onclick="return loadContent(event, './post-it.html', 'html')">Post It</a>
-            <a href="./test-keyboard.html" onclick="return loadContent(event, './test-keyboard.html', 'html')">Test Keyboard</a>
+            <a href="./post-it.html" data-type="html">Post It</a>
+            <a href="./test-keyboard.html" data-type="html">Test Keyboard</a>
             <div class="section">Boring stuff</div>
-            <a href="./LICENSE" onclick="return loadContent(event, './LICENSE', 'text')">LICENSE</a>
+            <a href="./LICENSE" data-type="text">LICENSE</a>
         </div>
         <div class="content" id="content">
             <div class="hint">← Pick one</div>
         </div>
     </div>
     <script>
+        document.querySelectorAll('.sidebar a').forEach(link => {
+            link.addEventListener('click', function(event) {
+                loadContent(event, this.href, this.getAttribute('data-type'));
+            });
+        });
+
         function loadContent(event, file, type) {
             if (event.shiftKey || event.ctrlKey || event.metaKey) return true; // Allow default behavior for new tab/window
             event.preventDefault();
