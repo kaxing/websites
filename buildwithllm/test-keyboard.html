@@ -1,0 +1,21 @@
+<body>
+<style>
+body{background:#f0f0f0;margin:0;height:100vh;overflow:hidden}
+div{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:grid;grid:60px 60px/repeat(3,60px);gap:10px}
+button{font:2rem sans-serif;border:0;border-radius:12px;background:#e6e6e6;box-shadow:5px 5px 10px #ccc,-5px -5px 10px #fff;color:#666}
+.a{box-shadow:inset 5px 5px 10px #ccc,inset -5px -5px 10px #fff}
+</style>
+<div id=g></div>
+<script>
+const m={ArrowUp:0,ArrowLeft:1,ArrowDown:2,ArrowRight:3}
+g.innerHTML=',↑,,←,↓,→'.split(',').map(v=>v?`<button>${v}</button>`:'<i></i>').join('')
+let B=[...g.getElementsByTagName('button')]
+const a=(k,f=1)=>k.classList.toggle('a',f)
+B.forEach(k=>{
+    k.onmousedown=()=>a(k)
+    k.onmouseup=k.onmouseleave=()=>a(k,0)
+})
+onkeydown=e=>{if(m[e.key]!==undefined){e.preventDefault();a(B[m[e.key]])}}
+onkeyup=e=>{if(m[e.key]!==undefined){e.preventDefault();a(B[m[e.key]],0)}}
+</script>
+</body>
