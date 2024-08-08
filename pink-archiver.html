@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drop to Compress or Uncompress</title>
+    <style>
+        body, html { height: 100%; margin: 0; font-family: Arial, sans-serif; background-color: #fff0f5; color: #333; display: flex; justify-content: center; align-items: center; }
+        .container { background-color: #fff; border-radius: 10px; padding: 30px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); text-align: center; }
+        #dropZone { width: 300px; height: 200px; border: 3px dashed #ff69b4; border-radius: 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; margin: 20px auto; background-color: #ffebf2; transition: all 0.3s ease; }
+        #dropZone:hover, #dropZone.dragover { background-color: #ffd6e5; transform: scale(1.05); }
+        #dropZone p { margin: 10px 0 0; padding: 0; color: #ff1493; }
+        #status { margin-top: 20px; font-weight: bold; }
+        .emoji { font-size: 3em; margin-bottom: 10px; transition: all 0.5s ease; }
+        h1 { color: #ff1493; margin-bottom: 20px; }
+        #progressBar { width: 100%; background-color: #f0f0f0; border-radius: 5px; margin-top: 20px; display: none; overflow: hidden; }
+        #progressBar div { width: 0%; height: 30px; background-color: #4CAF50; border-radius: 5px; transition: width 0.5s; }
+        @keyframes slowToFast {
+            0% { width: 0%; }
+            10% { width: 10%; }
+            25% { width: 30%; }
+            50% { width: 50%; }
+            75% { width: 75%; }
+            90% { width: 93%; }
+            100% { width: 100%; }
+        }
+        .slowToFast {
+            animation: slowToFast 3s ease-in-out;
+        }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px) rotate(-5deg); } 75% { transform: translateX(5px) rotate(5deg); } }
+        .shake { animation: shake 0.5s ease-in-out; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Drop your file to Compress or Uncompress</h1>
+        <p>Just drag and drop</p>
+        <div id="dropZone">
+            <div class="emoji">📁✨</div>
+            <p>Drop your file here or click to select</p>
+        </div>
+        <div id="progressBar"><div></div></div>
+        <div id="status"></div>
+    </div>
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const statusElement = document.getElementById('status');
+        const emojiElement = dropZone.querySelector('.emoji');
+        const progressBar = document.getElementById('progressBar');
+        const progressBarInner = progressBar.querySelector('div');
+
+        function preventDefault(e) { e.preventDefault(); e.stopPropagation(); }
+        function highlight() { dropZone.classList.add('dragover'); }
+        function unhighlight() { dropZone.classList.remove('dragover'); }
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(event => dropZone.addEventListener(event, preventDefault));
+        ['dragenter', 'dragover'].forEach(event => dropZone.addEventListener(event, highlight));
+        ['dragleave', 'drop'].forEach(event => dropZone.addEventListener(event, unhighlight));
+
+        dropZone.addEventListener('drop', e => {
+            const items = e.dataTransfer.items;
+            if (items.length > 1 || (items[0].kind === 'file' && items[0].webkitGetAsEntry().isDirectory)) {
+                rejectMultipleOrFolder();
+            } else {
+                processFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        dropZone.addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.onchange = e => processFile(e.target.files[0]);
+            input.click();
+        });
+
+        function rejectMultipleOrFolder() {
+            emojiElement.textContent = '🙅‍♂️';
+            emojiElement.classList.add('shake');
+            statusElement.textContent = "Oops! We can only handle one file at a time. No folders, please! 🚫📁";
+            setTimeout(() => {
+                emojiElement.textContent = '📁✨';
+                emojiElement.classList.remove('shake');
+                statusElement.textContent = '';
+            }, 1700);
+        }
+
+        async function processFile(file) {
+            if (!file) return;
+            if (file.name.toLowerCase().endsWith('.html')) {
+                rejectHtmlFile();
+                return;
+            }
+            statusElement.textContent = 'Processing file... 🔍';
+            progressBar.style.display = 'block';
+            progressBarInner.style.width = '0%';
+            progressBarInner.classList.remove('slowToFast');
+
+            try {
+                const content = await file.arrayBuffer();
+                const isCompressed = file.name.endsWith('.compressed');
+                const result = isCompressed ? await decompress(content, updateProgress) : await compress(content, updateProgress);
+                const newFileName = isCompressed ? file.name.slice(0, -'.compressed'.length) : `${file.name}.compressed`;
+                updateProgress(100); // Set progress to 100% upon completion
+                createDownloadLink(result, newFileName);
+                statusElement.textContent = `File ${isCompressed ? 'decompressed' : 'compressed'} and ready! ${isCompressed ? '🌈' : '🎉'}`;
+                setTimeout(() => {
+                    progressBar.style.display = 'none';
+                    progressBarInner.style.width = '0%';
+                    progressBarInner.classList.remove('slowToFast');
+                }, 1000);
+            } catch (error) {
+                statusElement.textContent = `Error: ${error.message}. Check console for details.`;
+                progressBar.style.display = 'none';
+            }
+        }
+
+        function updateProgress(percent) {
+            const displayedProgress = percent < 93 ? percent : 93;
+            progressBarInner.style.width = `${displayedProgress}%`;
+            if (percent === 100) {
+                progressBarInner.classList.add('slowToFast');
+            }
+        }
+
+        function rejectHtmlFile() {
+            emojiElement.textContent = '🙅‍♂️';
+            emojiElement.classList.add('shake');
+            statusElement.textContent = "We don't compress our own kind! HTML files stick together. 🤝";
+            setTimeout(() => {
+                emojiElement.textContent = '📁✨';
+                emojiElement.classList.remove('shake');
+                statusElement.textContent = '';
+            }, 1700);
+        }
+
+        async function compress(content, progressCallback) {
+            const result = pako.gzip(new Uint8Array(content), { level: 9 });
+            progressCallback(100);
+            return result.buffer;
+        }
+
+        async function decompress(content, progressCallback) {
+            const result = pako.ungzip(new Uint8Array(content));
+            progressCallback(100);
+            return result.buffer;
+        }
+
+        function createDownloadLink(content, fileName) {
+            const url = URL.createObjectURL(new Blob([content]));
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
