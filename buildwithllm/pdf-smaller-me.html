@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF smaller me</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        #dropZone { border: 2px dashed #ccc; border-radius: 20px; width: 480px; padding: 20px; text-align: center; margin: 20px auto; }
+        #dropZone.highlight { border-color: #000; }
+        #fileInfo, #compressionInfo { margin-top: 20px; }
+        progress { width: 100%; }
+    </style>
+</head>
+<body>
+    <h1>PDF smaller me</h1>
+    <div id="dropZone">
+        <p>Drag & Drop your PDF here or click to select</p>
+        <input type="file" id="fileInput" accept=".pdf" style="display: none;">
+    </div>
+    <div id="fileInfo"></div>
+    <div id="compressionInfo"></div>
+    <progress id="progressBar" value="0" max="100" style="display: none;"></progress>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script>
+        const { PDFDocument } = PDFLib;
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const compressionInfo = document.getElementById('compressionInfo');
+        const progressBar = document.getElementById('progressBar');
+
+        ['dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.toggle('highlight', eventName === 'dragover');
+                if (eventName === 'drop') handleFiles(e.dataTransfer.files);
+            });
+        });
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+        function handleFiles(files) {
+            const file = files[0];
+            if (file && file.type === 'application/pdf') {
+                fileInfo.textContent = `File: ${file.name} (${formatFileSize(file.size)})`;
+                compressPDF(file);
+            } else {
+                alert('Please select a PDF file.');
+            }
+        }
+
+        async function compressPDF(file) {
+            progressBar.style.display = 'block';
+            compressionInfo.textContent = 'Shrinking your PDF...';
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdfDoc = await PDFDocument.load(arrayBuffer);
+                const pages = pdfDoc.getPages();
+                
+                const scaleFactor = 0.8;
+                
+                for (let i = 0; i < pages.length; i++) {
+                    const page = pages[i];
+                    const { width, height } = page.getSize();
+                    page.scale(scaleFactor, scaleFactor);
+                }
+
+                const pdfBytes = await pdfDoc.save();
+                
+                const compressedSize = pdfBytes.length;
+                const compressionRatio = (file.size / compressedSize).toFixed(2);
+
+                compressionInfo.innerHTML = `
+                    Original size: ${formatFileSize(file.size)}<br>
+                    Compressed size: ${formatFileSize(compressedSize)}<br>
+                    Compression ratio: ${compressionRatio}x<br>
+                    Pages resized to 80% of original
+                `;
+                const downloadLink = document.createElement('a');
+                downloadLink.href = URL.createObjectURL(new Blob([pdfBytes], { type: 'application/pdf' }));
+                downloadLink.download = `smaller_${file.name}`;
+                downloadLink.textContent = 'Download smaller PDF';
+                compressionInfo.appendChild(downloadLink);
+            } catch (error) {
+                console.error('Error compressing PDF:', error);
+                compressionInfo.textContent = `Oops! We encountered an error: ${error.message}. This PDF might have a structure we can't handle.`;
+            }
+            progressBar.style.display = 'none';
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+    </script>
+</body>
+</html>
