@@ -49,6 +49,11 @@ function toggleGrid() {
   gridLines.forEach(line => line.style.display = gridVisible ? 'block' : 'none');
 }
 
+function debug() {
+  toggleGrid();
+  console.log(`Debug grid ${gridVisible ? 'enabled' : 'disabled'}`);
+}
+
 function createGrid() {
   gridLines.forEach(line => gameZone.removeChild(line));
   gridLines = [];
@@ -175,34 +180,35 @@ function removeBall(ball) {
 
 function moveBall(ball) {
   if (!ball.isConnected || !ball.falling) return;
+
   let rect = ball.getBoundingClientRect();
   let x = parseFloat(ball.style.left);
   let y = parseFloat(ball.style.top);
   let vy = parseFloat(ball.dataset.vy);
   y += vy;
   let maxY = gameZone.clientHeight - rect.height;
-  const gridX = Math.floor(x / gridSize);
-  const gridY = Math.floor(y / gridSize);
   let collision = false;
   
-  for (let i = Math.max(0, gridY - 1); i <= Math.min(grid.length - 1, gridY + 1); i++) {
-    for (let j = Math.max(0, gridX - 1); j <= Math.min(grid[0].length - 1, gridX + 1); j++) {
-      if (grid[i][j] && grid[i][j] !== ball) {
-        let otherBall = grid[i][j];
-        let dx = x - parseFloat(otherBall.style.left);
-        let dy = y - parseFloat(otherBall.style.top);
-        let distance = Math.sqrt(dx * dx + dy * dy);
-        let minDist = (rect.width + parseFloat(otherBall.style.width)) / 2 * 0.9;
-        if (distance < minDist) {
-          collision = true;
-          y = parseFloat(otherBall.style.top) - rect.height * 0.9;
-          break;
-        }
-      }
-    }
-    if (collision) break;
-  }
+  // Check for collision only with balls directly beneath this ball
+  const potentialColliders = Array.from(gameZone.getElementsByClassName('ballPoolBall')).filter(otherBall => {
+    if (otherBall === ball) return false;
+    const otherRect = otherBall.getBoundingClientRect();
+    const dx = Math.abs(x - parseFloat(otherBall.style.left));
+    const dy = y - parseFloat(otherBall.style.top);
+    return dx < rect.width && dy >= 0 && dy < rect.height;
+  });
   
+  for (let otherBall of potentialColliders) {
+    const otherY = parseFloat(otherBall.style.top);
+    const minDist = (rect.height + otherBall.offsetHeight) / 2;
+    
+    if (y + rect.height >= otherY && y <= otherY + otherBall.offsetHeight) {
+      collision = true;
+      y = otherY - rect.height; // Position the ball right above the other ball
+      break;
+    }
+  }
+
   if (collision || y >= maxY) {
     y = Math.min(y, maxY);
     vy = 0;
@@ -285,7 +291,12 @@ restartButton.onclick = startGame;
 function updateGameZoneDimensions() {
   gameZone.style.width = `${window.innerWidth}px`;
   gameZone.style.height = `${window.innerHeight}px`;
-  createGrid();
+  
+  if (gridVisible) {
+    createGrid();
+  } else {
+    initGrid();
+  }
 }
 
 window.addEventListener('resize', () => {
@@ -303,7 +314,7 @@ window.addEventListener('resize', () => {
     ball.style.left = `${x}px`;
     ball.style.top = `${y}px`;
     updateGridPosition(ball, x, y);
-    
+
     // Reset velocity for balls not at the bottom
     if (y < gameZone.clientHeight - rect.height) {
       ball.dataset.vy = "2";
@@ -367,22 +378,28 @@ function updateFallingStatus() {
     const ball = balls[i];
     const x = parseFloat(ball.style.left);
     const y = parseFloat(ball.style.top);
-    const gridX = Math.floor(x / gridSize);
-    const gridY = Math.floor(y / gridSize);
+    const radius = ball.offsetWidth / 2;
     
     let shouldFall = true;
     
-    if (y >= gameZone.clientHeight - ball.offsetHeight) {
+    if (y + ball.offsetHeight >= gameZone.clientHeight) {
       shouldFall = false;
     } else {
-      for (let j = i + 1; j < balls.length; j++) {
-        const otherBall = balls[j];
-        const dx = x - parseFloat(otherBall.style.left);
-        const dy = y + ball.offsetHeight - parseFloat(otherBall.style.top);
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        if (distance < (ball.offsetWidth + otherBall.offsetWidth) / 2 * 0.95) {
-          shouldFall = false;
-          break;
+      for (let j = 0; j < balls.length; j++) {
+        if (i !== j) {
+          const otherBall = balls[j];
+          const otherX = parseFloat(otherBall.style.left);
+          const otherY = parseFloat(otherBall.style.top);
+          const otherRadius = otherBall.offsetWidth / 2;
+          
+          const dx = x - otherX;
+          const dy = y - otherY;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          if (distance < radius + otherRadius && y < otherY) {
+            shouldFall = false;
+            break;
+          }
         }
       }
     }
@@ -397,9 +414,6 @@ function updateFallingStatus() {
     }
 
     updateGridPosition(ball, x, y);
-    
-    // If this ball should fall, balls above it might also need to fall
-    if (!shouldFall) break;
   }
 }
 
