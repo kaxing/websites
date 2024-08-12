@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<style>
+body { margin: 0; padding: 0; font-family: Arial, sans-serif; font-size: 12px; }
+#canvas { position: relative; width: 98vw; height: 98vh; margin: 1vh 1vw; overflow: hidden; }
+.node { position: absolute; border: 1px solid black; background: white; width: 200px; height: auto; display: flex; }
+.handle { width: 7px; background: #ddd; cursor: move; display: flex; align-items: center; justify-content: center; }
+.handle::before { content: ''; height: 80%; width: 1px; background: #bbb; }
+.content { flex-grow: 1; display: flex; flex-direction: column; padding: 5px; box-sizing: border-box; }
+.title { font-weight: bold; margin-bottom: 3px; font-size: 11px; }
+textarea { flex-grow: 1; resize: none; margin-bottom: 3px; padding: 2px; font-size: 10px; min-height: 50px; }
+textarea::placeholder { color: #999; }
+button { align-self: flex-start; padding: 2px 5px; font-size: 10px; margin-right: 5px; }
+#connections { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+.connection { stroke: #aaa; stroke-width: 0.5; }
+#api-key-input { position: fixed; top: 10px; left: 10px; z-index: 1000; }
+button:disabled { background-color: #cccccc; color: #666666; cursor: not-allowed; }
+</style>
+</head>
+<body>
+<input type="password" id="api-key-input" placeholder="OpenAI API Key">
+<div id="canvas">
+    <svg id="connections" width="100%" height="100%"></svg>
+</div>
+<script>
+let nodeCount = 0;
+let nodes = new Map();
+
+function generateId() {
+    return 'node-' + Math.random().toString(36).substr(2, 9);
+}
+
+async function generate(nodeId) {
+    const node = document.getElementById(nodeId);
+    const generateButton = node.querySelector('button');
+    generateButton.disabled = true;
+    generateButton.textContent = 'Generating...';
+
+    const messages = collectMessages(nodeId);
+    
+    const apiKey = document.getElementById('api-key-input').value;
+    
+    try {
+        const generatedContent = await generateResponse(messages, apiKey);
+        const assistantContent = node.querySelector('.assistant-content');
+        assistantContent.value = generatedContent;
+    } catch (error) {
+        console.error('Error generating content:', error);
+        alert('Failed to generate content. Please check your API key and try again.');
+    } finally {
+        generateButton.disabled = false;
+        generateButton.textContent = 'Generate';
+    }
+}
+
+function createNode(x, y, parentId) {
+    const node = document.createElement('div');
+    node.className = 'node';
+    const nodeId = generateId();
+    node.id = nodeId;
+    node.style.transform = `translate(${x}px, ${y}px)`;
+    nodeCount++;
+    node.innerHTML = `
+        <div class="handle"></div>
+        <div class="content">
+            <div class="title" contenteditable>Node ${nodeCount}</div>
+            <textarea class="user-input" placeholder="${parentId ? 'User' : 'System Prompt'}"></textarea>
+            ${parentId ? `<textarea class="assistant-content" placeholder="Assistant" readonly></textarea>` : ''}
+            <div>
+                ${parentId ? '<button onclick="generate(\'' + nodeId + '\')">Generate</button>' : ''}
+                <button onclick="addChild('${nodeId}')">Add</button>
+            </div>
+        </div>
+    `;
+    document.getElementById('canvas').appendChild(node);
+    nodes.set(nodeId, { x, y, parentId, children: [] });
+    if (parentId) {
+        nodes.get(parentId).children.push(nodeId);
+    }
+    makeDraggable(node);
+    updateConnections();
+    return nodeId;
+}
+
+function addChild(parentId) {
+    const parent = document.getElementById(parentId);
+    if (!parent) return;
+    const parentPos = nodes.get(parentId);
+    const siblingCount = parentPos.children.length;
+    let x = parentPos.x + 220;
+    let y = parentPos.y + (siblingCount * 160);
+
+    const canvasRect = document.getElementById('canvas').getBoundingClientRect();
+    x = Math.min(Math.max(x, 0), canvasRect.width - 200);
+    y = Math.min(Math.max(y, 0), canvasRect.height - 120);
+
+    createNode(x, y, parentId);
+}
+
+function collectMessages(nodeId) {
+    let messages = [];
+    let currentNodeId = nodeId;
+
+    while (currentNodeId) {
+        const node = nodes.get(currentNodeId);
+        if (!node) break;
+
+        const nodeElement = document.getElementById(currentNodeId);
+        const userInput = nodeElement.querySelector('.user-input');
+        const assistantContent = nodeElement.querySelector('.assistant-content');
+
+        if (!node.parentId) {
+            // Root node (system prompt)
+            messages.unshift({ role: "system", content: userInput.value || 'You are a helpful assistant.' });
+        } else {
+            // User input
+            messages.unshift({ role: "user", content: userInput.value || 'User message' });
+            
+            // If there's an assistant response, include it
+            if (assistantContent && assistantContent.value) {
+                messages.unshift({ role: "assistant", content: assistantContent.value });
+            }
+        }
+
+        currentNodeId = node.parentId;
+    }
+
+    return messages;
+}
+
+async function generateResponse(messages, apiKey) {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+            model: "gpt-4o",
+            messages: messages
+        })
+    });
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+}
+
+function makeDraggable(node) {
+    const handle = node.querySelector('.handle');
+    let isDragging = false;
+    let startX, startY;
+
+    handle.addEventListener('mousedown', startDrag);
+    handle.addEventListener('touchstart', startDrag, { passive: false });
+
+    function startDrag(e) {
+        isDragging = true;
+        const transform = new DOMMatrix(window.getComputedStyle(node).transform);
+        startX = (e.clientX || e.touches[0].clientX) - transform.e;
+        startY = (e.clientY || e.touches[0].clientY) - transform.f;
+        e.preventDefault();
+        document.addEventListener('mousemove', drag);
+        document.addEventListener('touchmove', drag, { passive: false });
+        document.addEventListener('mouseup', endDrag);
+        document.addEventListener('touchend', endDrag);
+    }
+
+    function drag(e) {
+        if (!isDragging) return;
+        const clientX = e.clientX || e.touches[0].clientX;
+        const clientY = e.clientY || e.touches[0].clientY;
+        const canvasRect = document.getElementById('canvas').getBoundingClientRect();
+        let newX = clientX - startX - canvasRect.left;
+        let newY = clientY - startY - canvasRect.top;
+        
+        newX = Math.min(Math.max(newX, 0), canvasRect.width - node.offsetWidth);
+        newY = Math.min(Math.max(newY, 0), canvasRect.height - node.offsetHeight);
+        
+        node.style.transform = `translate(${newX}px, ${newY}px)`;
+        nodes.get(node.id).x = newX;
+        nodes.get(node.id).y = newY;
+        updateConnections();
+        e.preventDefault();
+    }
+
+    function endDrag() {
+        isDragging = false;
+        document.removeEventListener('mousemove', drag);
+        document.removeEventListener('touchmove', drag);
+        document.removeEventListener('mouseup', endDrag);
+        document.removeEventListener('touchend', endDrag);
+    }
+}
+
+function updateConnections() {
+    const svg = document.getElementById('connections');
+    svg.innerHTML = '';
+    nodes.forEach((node, nodeId) => {
+        if (node.parentId) {
+            createConnection(node.parentId, nodeId);
+        }
+    });
+}
+
+function createConnection(parentId, childId) {
+    const svg = document.getElementById('connections');
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.id = `connection-${parentId}-${childId}`;
+    line.classList.add('connection');
+    svg.appendChild(line);
+    updateConnection(line, parentId, childId);
+}
+
+function updateConnection(line, parentId, childId) {
+    const parent = document.getElementById(parentId);
+    const child = document.getElementById(childId);
+    if (!parent || !child) return;
+
+    const parentRect = parent.getBoundingClientRect();
+    const childRect = child.getBoundingClientRect();
+    const canvasRect = document.getElementById('canvas').getBoundingClientRect();
+
+    const parentCenter = {
+        x: parentRect.left + parentRect.width / 2,
+        y: parentRect.top + parentRect.height / 2
+    };
+    const childCenter = {
+        x: childRect.left + childRect.width / 2,
+        y: childRect.top + childRect.height / 2
+    };
+
+    let x1, y1, x2, y2;
+
+    if (Math.abs(childCenter.x - parentCenter.x) > Math.abs(childCenter.y - parentCenter.y)) {
+        y1 = parentCenter.y - canvasRect.top;
+        y2 = childCenter.y - canvasRect.top;
+        if (childCenter.x > parentCenter.x) {
+            x1 = parentRect.right - canvasRect.left;
+            x2 = childRect.left - canvasRect.left;
+        } else {
+            x1 = parentRect.left - canvasRect.left;
+            x2 = childRect.right - canvasRect.left;
+        }
+    } else {
+        x1 = parentCenter.x - canvasRect.left;
+        x2 = childCenter.x - canvasRect.left;
+        if (childCenter.y > parentCenter.y) {
+            y1 = parentRect.bottom - canvasRect.top;
+            y2 = childRect.top - canvasRect.top;
+        } else {
+            y1 = parentRect.top - canvasRect.top;
+            y2 = childRect.bottom - canvasRect.top;
+        }
+    }
+
+    line.setAttribute('x1', x1);
+    line.setAttribute('y1', y1);
+    line.setAttribute('x2', x2);
+    line.setAttribute('y2', y2);
+}
+
+window.addChild = addChild;
+window.generate = generate;
+
+createNode(50, 50);
+</script>
+</body>
+</html>

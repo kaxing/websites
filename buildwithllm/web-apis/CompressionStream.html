@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Compression Example</title>
+</head>
+<body>
+    <input type="file" id="fileInput">
+    <button id="compressButton">Compress and Download</button>
+    <a id="downloadLink" style="display:none;">Download Compressed File</a>
+
+    <script>
+        document.getElementById('compressButton').addEventListener('click', async () => {
+            const file = document.getElementById('fileInput').files[0];
+            if (!file) return;
+
+            const compressedStream = file.stream().pipeThrough(new CompressionStream('gzip'));
+            const compressedChunks = [];
+            const reader = compressedStream.getReader();
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                compressedChunks.push(value);
+            }
+
+            const compressedBlob = new Blob(compressedChunks, { type: 'application/gzip' });
+            const downloadLink = document.getElementById('downloadLink');
+            downloadLink.href = URL.createObjectURL(compressedBlob);
+            downloadLink.download = file.name + '.gz';
+            downloadLink.style.display = 'block';
+        });
+    </script>
+</body>
+</html>

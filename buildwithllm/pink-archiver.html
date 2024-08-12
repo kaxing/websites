@@ -30,7 +30,7 @@
         @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px) rotate(-5deg); } 75% { transform: translateX(5px) rotate(5deg); } }
         .shake { animation: shake 0.5s ease-in-out; }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -135,13 +135,13 @@
         }
 
         async function compress(content, progressCallback) {
-            const result = pako.gzip(new Uint8Array(content), { level: 9 });
+            const result = fflate.gzipSync(new Uint8Array(content), { level: 9 });
             progressCallback(100);
             return result.buffer;
         }
 
         async function decompress(content, progressCallback) {
-            const result = pako.ungzip(new Uint8Array(content));
+            const result = fflate.gunzipSync(new Uint8Array(content));
             progressCallback(100);
             return result.buffer;
         }

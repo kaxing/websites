@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+body{margin:0;overflow:hidden;font-family:Arial;touch-action:none}
+#gameZone{position:relative;width:100vw;height:100vh;background:#fff5e6}
+#vitalityBar{position:absolute;top:10px;left:10px;width:30vw;max-width:200px;height:20px;background:rgba(255,230,153,0.3);border-radius:10px;overflow:hidden;box-shadow:0 0 10px rgba(255,230,153,0.5)}
+#vitalityFill{position:absolute;top:0;left:0;height:100%;background:#ffe699;transition:width .3s;box-shadow:0 0 15px #ffe699;animation:glowPulse 2s infinite}
+#specialMoveArea{position:absolute;top:35px;left:10px;display:grid;grid-template-columns:repeat(10, 1fr);gap:2px;width:30vw;max-width:200px}
+.specialMoveDot{width:18px;height:18px;background:#90EE90;border:none;border-radius:50%;cursor:pointer;transition:transform 0.1s;padding:0}
+.specialMoveDot:active{transform:scale(0.9)}
+.ballPoolBall{position:absolute;border-radius:50%;box-shadow:0 4px 8px rgba(0,0,0,0.2);transition:all 0.1s}
+#expandButton{position:absolute;top:10px;right:10px;width:40px;height:40px;background:white;font-size:20px;border-radius:5px;cursor:pointer;border:none}
+@keyframes shrinkIn{0%{transform:scale(1)}50%{transform:scale(0.8)}100%{transform:scale(0)}}
+@keyframes rippleIn{0%{transform:scale(0);opacity:1}100%{transform:scale(1.5);opacity:0}}
+@keyframes glowPulse{0%{box-shadow:0 0 15px #ffe699}50%{box-shadow:0 0 25px #ffe699}100%{box-shadow:0 0 15px #ffe699}}
+.shrink{animation:shrinkIn 0.3s ease-out forwards}
+.ripple{position:absolute;border-radius:50%;background:rgba(255,255,255,0.7);width:100%;height:100%;animation:rippleIn 0.3s ease-out}
+#gameEndPopup{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(255,255,255,0.9);padding:20px;border-radius:10px;text-align:center;display:none;z-index:1000}
+#restartButton{margin-top:10px;padding:10px 20px;background:#90EE90;border:none;border-radius:5px;cursor:pointer}
+.grid-line{position:absolute;background:rgba(200,200,200,0.3)}
+</style>
+</head>
+<body>
+<div id="gameZone">
+  <div id="vitalityBar"><div id="vitalityFill"></div></div>
+  <div id="specialMoveArea"></div>
+  <button id="expandButton">⤢</button>
+  <div id="gameEndPopup">
+    <h2>Game Over!</h2>
+    <p>Too many balls.</p>
+    <p id="finalScore"></p>
+    <button id="restartButton">Play Again</button>
+  </div>
+</div>
+<script>
+const gameZone = document.getElementById('gameZone');
+const vitalityFill = document.getElementById('vitalityFill');
+const specialMoveArea = document.getElementById('specialMoveArea');
+const gameEndPopup = document.getElementById('gameEndPopup');
+const restartButton = document.getElementById('restartButton');
+const finalScore = document.getElementById('finalScore');
+
+let gridVisible = false, gridLines = [], vitality = 35, specialMoves = 0, lastBallTime = Date.now(), isGameOver = false;
+let score = 0, ballDropRate = 800, grid = [], gridSize = 20;
+
+function toggleGrid() {
+  gridVisible = !gridVisible;
+  gridLines.forEach(line => line.style.display = gridVisible ? 'block' : 'none');
+}
+
+function createGrid() {
+  gridLines.forEach(line => gameZone.removeChild(line));
+  gridLines = [];
+  for (let x = gridSize; x < gameZone.clientWidth; x += gridSize) {
+    let line = document.createElement('div');
+    line.className = 'grid-line';
+    line.style.cssText = `left:${x}px;top:0;width:1px;height:100%`;
+    gameZone.appendChild(line);
+    gridLines.push(line);
+  }
+  for (let y = gridSize; y < gameZone.clientHeight; y += gridSize) {
+    let line = document.createElement('div');
+    line.className = 'grid-line';
+    line.style.cssText = `left:0;top:${y}px;width:100%;height:1px`;
+    gameZone.appendChild(line);
+    gridLines.push(line);
+  }
+  toggleGrid();
+}
+
+function initGrid() {
+  const cols = Math.ceil(gameZone.clientWidth / gridSize);
+  const rows = Math.ceil(gameZone.clientHeight / gridSize);
+  grid = new Array(rows).fill().map(() => new Array(cols).fill(null));
+}
+
+function updateUI() {
+  vitalityFill.style.width = `${vitality}%`;
+  specialMoveArea.innerHTML = '';
+  for (let i = 0; i < specialMoves; i++) {
+    let dot = document.createElement('button');
+    dot.className = 'specialMoveDot';
+    dot.onclick = useSpecialMove;
+    specialMoveArea.appendChild(dot);
+  }
+}
+
+function useSpecialMove() {
+  if (specialMoves > 0 && !isGameOver) {
+    specialMoves--;
+    Array.from(gameZone.getElementsByClassName('ballPoolBall'))
+      .filter(ball => ball.offsetTop + ball.offsetHeight >= gameZone.clientHeight - 10)
+      .sort((a, b) => b.offsetTop - a.offsetTop)
+      .slice(0, 10)
+      .forEach(removeBall);
+    updateUI();
+    playSound('special');
+    
+    setTimeout(updateFallingStatus, 350);
+  }
+}
+
+function createBallPoolBall() {
+  let mass = Math.floor(Math.random() * 8) + 2;
+  let ball = document.createElement('div');
+  let size = 40 + mass * 2;
+  let x = Math.random() * (gameZone.clientWidth - size);
+  ball.className = 'ballPoolBall';
+  let isDark = Math.random() < 0.05;
+  let isRed = !isDark && Math.random() < 0.5;
+  ball.style.cssText = `width:${size}px;height:${size}px;left:${x}px;top:-${size}px;background:${isDark ? 'rgba(0,0,150,0.7)' : isRed ? 'rgba(255,100,100,0.7)' : 'rgba(100,100,255,0.7)'}`;
+  gameZone.appendChild(ball);
+
+  let y = -size, vy = 2;
+  ball.style.top = `${y}px`;
+  ball.falling = true;
+  ball.dataset.vy = vy.toString();
+  moveBall(ball);
+
+  ball.onclick = e => {
+    e.preventDefault();
+    if (!ball.isConnected || isGameOver || parseFloat(ball.dataset.vy) === 0) return;
+    if (isDark) specialMoves++;
+    else if (isRed) vitality = Math.max(0, vitality - mass);
+    else {
+      vitality = Math.min(100, vitality + mass);
+      if (vitality >= 100) {
+        specialMoves++;
+        vitality = 0;
+      }
+    }
+    score += mass;
+    removeBall(ball);
+    updateUI();
+    playSound('pop');
+  };
+}
+
+function updateGridPosition(ball, x, y) {
+  const gridX = Math.floor(x / gridSize);
+  const gridY = Math.floor(y / gridSize);
+  for (let i = 0; i < grid.length; i++) {
+    for (let j = 0; j < grid[i].length; j++) {
+      if (grid[i][j] === ball) {
+        grid[i][j] = null;
+      }
+    }
+  }
+  if (gridY >= 0 && gridY < grid.length && gridX >= 0 && gridX < grid[0].length) {
+    grid[gridY][gridX] = ball;
+  }
+}
+
+function removeBall(ball) {
+  ball.classList.add('shrink');
+  let ripple = document.createElement('div');
+  ripple.className = 'ripple';
+  ball.appendChild(ripple);
+  
+  // Update grid immediately
+  const gridX = Math.floor(parseFloat(ball.style.left) / gridSize);
+  const gridY = Math.floor(parseFloat(ball.style.top) / gridSize);
+  if (grid[gridY] && grid[gridY][gridX] === ball) {
+    grid[gridY][gridX] = null;
+  }
+  
+  setTimeout(() => {
+    if (ball.isConnected) {
+      gameZone.removeChild(ball);
+    }
+    updateFallingStatus();  // Add this line
+  }, 300);
+}
+
+function moveBall(ball) {
+  if (!ball.isConnected || !ball.falling) return;
+  let rect = ball.getBoundingClientRect();
+  let x = parseFloat(ball.style.left);
+  let y = parseFloat(ball.style.top);
+  let vy = parseFloat(ball.dataset.vy);
+  y += vy;
+  let maxY = gameZone.clientHeight - rect.height;
+  const gridX = Math.floor(x / gridSize);
+  const gridY = Math.floor(y / gridSize);
+  let collision = false;
+  
+  for (let i = Math.max(0, gridY - 1); i <= Math.min(grid.length - 1, gridY + 1); i++) {
+    for (let j = Math.max(0, gridX - 1); j <= Math.min(grid[0].length - 1, gridX + 1); j++) {
+      if (grid[i][j] && grid[i][j] !== ball) {
+        let otherBall = grid[i][j];
+        let dx = x - parseFloat(otherBall.style.left);
+        let dy = y - parseFloat(otherBall.style.top);
+        let distance = Math.sqrt(dx * dx + dy * dy);
+        let minDist = (rect.width + parseFloat(otherBall.style.width)) / 2 * 0.9;
+        if (distance < minDist) {
+          collision = true;
+          y = parseFloat(otherBall.style.top) - rect.height * 0.9;
+          break;
+        }
+      }
+    }
+    if (collision) break;
+  }
+  
+  if (collision || y >= maxY) {
+    y = Math.min(y, maxY);
+    vy = 0;
+    ball.falling = false;
+  }
+  
+  ball.style.top = `${y}px`;
+  ball.dataset.vy = vy;
+  updateGridPosition(ball, x, y);
+  
+  if (ball.falling) {
+    requestAnimationFrame(() => moveBall(ball));
+  }
+}
+
+function checkGameOver() {
+  if (isGameOver) return;
+  const topThreshold = 3;
+  for (let row = 0; row < topThreshold; row++) {
+    for (let col = 0; col < grid[row].length; col++) {
+      if (grid[row][col] !== null) {
+        const ball = grid[row][col];
+        if (parseFloat(ball.dataset.vy) === 0) {
+          isGameOver = true;
+          gameEndPopup.style.display = 'block';
+          finalScore.textContent = `Your score: ${score}`;
+          gameZone.style.opacity = '0.7';
+          playSound('gameOver');
+          return;
+        }
+      }
+    }
+  }
+}
+
+function gameLoop() {
+  if (!isGameOver && Date.now() - lastBallTime > ballDropRate) {
+    createBallPoolBall();
+    lastBallTime = Date.now();
+    ballDropRate = Math.max(300, ballDropRate - 1);
+    updateFallingStatus();  // Add this line
+  }
+  checkGameOver();
+  if (!isGameOver) {
+    requestAnimationFrame(gameLoop);
+  }
+}
+
+document.getElementById('expandButton').onclick = () =>
+  document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+
+gameZone.onmousedown = e => {
+  if (e.target === gameZone && !isGameOver) {
+    vitality = Math.max(0, vitality - 1);
+    updateUI();
+  }
+};
+
+document.body.ontouchmove = e => e.preventDefault();
+
+function startGame() {
+  isGameOver = false;
+  vitality = 35;
+  specialMoves = 0;
+  score = 0;
+  ballDropRate = 800;
+  gameEndPopup.style.display = 'none';
+  gameZone.style.opacity = '1';
+  Array.from(gameZone.getElementsByClassName('ballPoolBall')).forEach(ball => gameZone.removeChild(ball));
+  initGrid();
+  updateUI();
+  lastBallTime = Date.now();
+  gameLoop();
+  playSound('restart');
+  createGrid();
+}
+
+restartButton.onclick = startGame;
+
+function updateGameZoneDimensions() {
+  gameZone.style.width = `${window.innerWidth}px`;
+  gameZone.style.height = `${window.innerHeight}px`;
+  createGrid();
+}
+
+window.addEventListener('resize', () => {
+  const oldHeight = gameZone.clientHeight;
+  updateGameZoneDimensions();
+  const newHeight = gameZone.clientHeight;
+  const heightDiff = newHeight - oldHeight;
+  initGrid();
+  
+  Array.from(gameZone.getElementsByClassName('ballPoolBall')).forEach(ball => {
+    let rect = ball.getBoundingClientRect();
+    let x = Math.max(0, Math.min(parseFloat(ball.style.left), gameZone.clientWidth - rect.width));
+    let y = parseFloat(ball.style.top) + heightDiff;
+    y = Math.max(-rect.height, Math.min(y, gameZone.clientHeight - rect.height));
+    ball.style.left = `${x}px`;
+    ball.style.top = `${y}px`;
+    updateGridPosition(ball, x, y);
+    
+    // Reset velocity for balls not at the bottom
+    if (y < gameZone.clientHeight - rect.height) {
+      ball.dataset.vy = "2";
+      if (!ball.falling) {
+        ball.falling = true;
+        moveBall(ball);
+      }
+    } else {
+      ball.dataset.vy = "0";
+      ball.falling = false;
+    }
+  });
+});
+
+let audioContext, oscillator;
+
+function playSound(soundType) {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (oscillator) {
+    oscillator.stop();
+  }
+  oscillator = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+  switch (soundType) {
+    case 'pop':
+      oscillator.frequency.setValueAtTime(440, audioContext.currentTime); // A4 note
+      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + 0.1);
+      break;
+    case 'special':
+      oscillator.frequency.setValueAtTime(660, audioContext.currentTime); // E5 note
+      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + 0.2);
+      break;
+    case 'gameOver':
+      oscillator.frequency.setValueAtTime(220, audioContext.currentTime); // A3 note
+      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + 0.5);
+      break;
+    case 'restart':
+      oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime); // C5 note
+      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + 0.3);
+      break;
+  }
+}
+
+function updateFallingStatus() {
+  const balls = Array.from(gameZone.getElementsByClassName('ballPoolBall'));
+  balls.sort((a, b) => parseFloat(b.style.top) - parseFloat(a.style.top));
+  
+  for (let i = 0; i < balls.length; i++) {
+    const ball = balls[i];
+    const x = parseFloat(ball.style.left);
+    const y = parseFloat(ball.style.top);
+    const gridX = Math.floor(x / gridSize);
+    const gridY = Math.floor(y / gridSize);
+    
+    let shouldFall = true;
+    
+    if (y >= gameZone.clientHeight - ball.offsetHeight) {
+      shouldFall = false;
+    } else {
+      for (let j = i + 1; j < balls.length; j++) {
+        const otherBall = balls[j];
+        const dx = x - parseFloat(otherBall.style.left);
+        const dy = y + ball.offsetHeight - parseFloat(otherBall.style.top);
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < (ball.offsetWidth + otherBall.offsetWidth) / 2 * 0.95) {
+          shouldFall = false;
+          break;
+        }
+      }
+    }
+    
+    if (shouldFall && !ball.falling) {
+      ball.falling = true;
+      ball.dataset.vy = "2";
+      moveBall(ball);
+    } else if (!shouldFall && ball.falling) {
+      ball.falling = false;
+      ball.dataset.vy = "0";
+    }
+
+    updateGridPosition(ball, x, y);
+    
+    // If this ball should fall, balls above it might also need to fall
+    if (!shouldFall) break;
+  }
+}
+
+updateUI();
+updateGameZoneDimensions();
+initGrid();
+startGame();
+</script>
+</body>
+</html>
