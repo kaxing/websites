@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Post-It Notes</title>
+<title>Post-It Notes Webapp</title>
 <style>
   body { font-family: Arial, sans-serif; background-color: #f5f5f5; margin: 0; }
   .post-it { width: 200px; height: 200px; border: 1px solid #ccc; box-shadow: 0 0 5px rgba(0, 0, 0, 0.1); position: absolute; cursor: move; border-radius: 8px; display: flex; flex-direction: column; }
@@ -44,19 +44,47 @@
     `; const input = postIt.querySelector('input'); input.addEventListener('input', saveNotes); const textarea = postIt.querySelector('textarea'); textarea.addEventListener('input', saveNotes); makeDraggable(postIt); return postIt;
   }
   function makeDraggable(element) {
-    const header = element.querySelector('.header'); let trashCan = document.querySelector('.trash-can');
-    header.addEventListener('mousedown', (e) => {
-      element.style.zIndex = zIndex.value++; const offsetX = e.clientX - element.offsetLeft, offsetY = e.clientY - element.offsetTop;
-      const onMouseMove = (e) => {
-        element.style.left = `${e.clientX - offsetX}px`; element.style.top = `${e.clientY - offsetY}px`;
+    const header = element.querySelector('.header');
+    let trashCan = document.querySelector('.trash-can');
+
+    function startDrag(e) {
+      const isTouchEvent = e.type === 'touchstart';
+      const startX = isTouchEvent ? e.touches[0].clientX : e.clientX;
+      const startY = isTouchEvent ? e.touches[0].clientY : e.clientY;
+      element.style.zIndex = zIndex.value++;
+      const offsetX = startX - element.offsetLeft;
+      const offsetY = startY - element.offsetTop;
+
+      function drag(e) {
+        const isTouchEvent = e.type === 'touchmove';
+        const moveX = isTouchEvent ? e.touches[0].clientX : e.clientX;
+        const moveY = isTouchEvent ? e.touches[0].clientY : e.clientY;
+        element.style.left = `${moveX - offsetX}px`;
+        element.style.top = `${moveY - offsetY}px`;
         trashCan.style.backgroundColor = isTouchingTrashCan(element, trashCan) ? '#ff6666' : '#ccc';
-      };
-      const onMouseUp = () => {
-        document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp);
-        if (isTouchingTrashCan(element, trashCan)) { element.remove(); saveNotes(); } trashCan.style.backgroundColor = '#ccc'; saveNotes();
-      };
-      document.addEventListener('mousemove', onMouseMove); document.addEventListener('mouseup', onMouseUp);
-    });
+      }
+
+      function endDrag() {
+        document.removeEventListener('mousemove', drag);
+        document.removeEventListener('mouseup', endDrag);
+        document.removeEventListener('touchmove', drag);
+        document.removeEventListener('touchend', endDrag);
+        if (isTouchingTrashCan(element, trashCan)) {
+          element.remove();
+          saveNotes();
+        }
+        trashCan.style.backgroundColor = '#ccc';
+        saveNotes();
+      }
+
+      document.addEventListener('mousemove', drag);
+      document.addEventListener('mouseup', endDrag);
+      document.addEventListener('touchmove', drag);
+      document.addEventListener('touchend', endDrag);
+    }
+
+    header.addEventListener('mousedown', startDrag);
+    header.addEventListener('touchstart', startDrag);
   }
   function isTouchingTrashCan(element, trashCan) {
     const elementRect = element.getBoundingClientRect(), trashCanRect = trashCan.getBoundingClientRect();
