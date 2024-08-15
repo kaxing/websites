@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Sign Me</title>
+<style>
+body{margin:0;font-family:Arial,sans-serif;overflow:hidden}
+#dropZone{border:2px dashed #ccc;padding:20px;text-align:center;height:100vh;display:flex;align-items:center;justify-content:center}
+#pdfViewer{display:none;height:calc(100vh - 50px);position:relative;overflow:auto;text-align:center}
+#controls{position:fixed;bottom:0;left:0;right:0;background:#f0f0f0;padding:10px;display:flex;justify-content:space-between}
+.signature{position:absolute;cursor:move;border:1px solid #000;overflow:hidden;touch-action:none}
+.signature-remove{position:absolute;top:0;right:0;width:20px;height:20px;color:#000;text-align:center;line-height:20px;cursor:pointer;font-size:16px;font-weight:bold}
+#signatureModal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);justify-content:center;align-items:center}
+#signatureCanvas{background:white;border:1px solid #000}
+#signatureControls{margin-top:10px;text-align:center}
+</style>
+</head>
+<body>
+<div id="dropZone">Drop PDF here or click to select a file</div>
+<div id="pdfViewer"></div>
+<div id="controls" style="display:none">
+<button id="prevPage">Previous</button>
+<span id="pageInfo"></span>
+<button id="nextPage">Next</button>
+<button id="addSignature">Add Signature</button>
+<button id="exportPDF">Export PDF</button>
+</div>
+<div id="signatureModal">
+<div>
+<canvas id="signatureCanvas" width="300" height="150"></canvas>
+<div id="signatureControls">
+<button id="saveSignature">Save</button>
+<button id="cancelSignature">Cancel</button>
+</div>
+</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.6.347/pdf.min.js"></script>
+<script src="https://unpkg.com/pdf-lib@1.17.1"></script>
+<script>
+let pdf,currentPage=1,signatures=[],isDrawing=false,startX,startY;
+const dropZone=document.getElementById('dropZone'),pdfViewer=document.getElementById('pdfViewer'),controls=document.getElementById('controls'),pageInfo=document.getElementById('pageInfo'),signatureModal=document.getElementById('signatureModal'),signatureCanvas=document.getElementById('signatureCanvas'),signatureCtx=signatureCanvas.getContext('2d');
+
+dropZone.addEventListener('click',()=>{const input=document.createElement('input');input.type='file';input.accept='.pdf';input.onchange=e=>{if(e.target.files[0])loadPDF(e.target.files[0])};input.click()});
+['dragover','drop'].forEach(event=>dropZone.addEventListener(event,e=>{e.preventDefault();if(event==='drop'){const file=e.dataTransfer.files[0];if(file.type==='application/pdf')loadPDF(file)}}));
+
+async function loadPDF(file){
+  try{
+    pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+    renderPage(1);dropZone.style.display='none';pdfViewer.style.display='block';controls.style.display='flex'
+  }catch(e){console.error('Error loading PDF:',e);alert('Error loading PDF. Please try again.')}
+}
+
+async function renderPage(num){
+  try{
+    const page=await pdf.getPage(num),scale=Math.min(pdfViewer.clientWidth/page.getViewport({scale:1}).width,1),viewport=page.getViewport({scale}),canvas=document.createElement('canvas');
+    canvas.height=viewport.height;canvas.width=viewport.width;
+    await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
+    pdfViewer.innerHTML='';
+    canvas.style.display='inline-block';
+    pdfViewer.appendChild(canvas);
+    pageInfo.textContent=`Page ${num} of ${pdf.numPages}`;currentPage=num;renderSignatures()
+  }catch(e){console.error('Error rendering page:',e);alert('Error rendering page. Please try again.')}
+}
+
+['prevPage','nextPage'].forEach(id=>document.getElementById(id).addEventListener('click',()=>renderPage(id==='prevPage'?currentPage-1:currentPage+1)));
+document.getElementById('addSignature').addEventListener('click',()=>{signatureModal.style.display='flex';signatureCtx.clearRect(0,0,signatureCanvas.width,signatureCanvas.height)});
+
+function startDrawing(e){isDrawing=true;[startX,startY]=[e.clientX-signatureCanvas.offsetLeft,e.clientY-signatureCanvas.offsetTop]}
+function draw(e){if(!isDrawing)return;const x=e.clientX-signatureCanvas.offsetLeft,y=e.clientY-signatureCanvas.offsetTop;signatureCtx.beginPath();signatureCtx.moveTo(startX,startY);signatureCtx.lineTo(x,y);signatureCtx.stroke();[startX,startY]=[x,y]}
+['mousedown','mousemove','mouseup'].forEach(event=>signatureCanvas.addEventListener(event,e=>event==='mouseup'?isDrawing=false:event==='mousedown'?startDrawing(e):draw(e)));
+['touchstart','touchmove','touchend'].forEach(event=>signatureCanvas.addEventListener(event,e=>{e.preventDefault();const touch=e.touches[0];if(event==='touchend')isDrawing=false;else if(event==='touchstart')startDrawing(touch);else draw(touch)}));
+
+document.getElementById('saveSignature').addEventListener('click',()=>{
+  const sig=document.createElement('div'),img=document.createElement('img'),removeBtn=document.createElement('div');
+  sig.className='signature';
+  const canvas=pdfViewer.querySelector('canvas');
+  const canvasRect=canvas.getBoundingClientRect();
+  const pdfViewerRect=pdfViewer.getBoundingClientRect();
+  const leftOffset=(pdfViewerRect.width-canvasRect.width)/2;
+  sig.style.cssText=`width:150px;height:75px;left:${leftOffset+10}px;top:10px;`;
+  img.src=signatureCanvas.toDataURL();img.style.cssText='width:100%;height:100%;';
+  removeBtn.className='signature-remove';removeBtn.textContent='×';
+  sig.appendChild(img);sig.appendChild(removeBtn);pdfViewer.appendChild(sig);
+  makeDraggable(sig);
+  signatures.push({page:currentPage,element:sig,position:getSignaturePosition(sig)});
+  signatureModal.style.display='none'
+});
+document.getElementById('cancelSignature').addEventListener('click',()=>signatureModal.style.display='none');
+
+function makeDraggable(el){
+  let pos1=0,pos2=0,pos3=0,pos4=0,isResizing=false,isDragging=false;
+  const img=el.querySelector('img'),aspectRatio=img.naturalWidth/img.naturalHeight,resizeHandle=document.createElement('div');
+  resizeHandle.style.cssText='position:absolute;right:0;bottom:0;width:10px;height:10px;cursor:se-resize;';el.appendChild(resizeHandle);
+  
+  function dragStart(e){
+    if(e.target.className==='signature-remove'){
+      el.remove();
+      signatures=signatures.filter(sig=>sig.element!==el);
+      return;
+    }
+    e.preventDefault();
+    isDragging=true;
+    pos3=e.clientX||e.touches[0].clientX;
+    pos4=e.clientY||e.touches[0].clientY;
+  }
+  
+  function dragMove(e){
+    if(!isDragging)return;
+    e.preventDefault();
+    pos1=pos3-(e.clientX||e.touches[0].clientX);
+    pos2=pos4-(e.clientY||e.touches[0].clientY);
+    pos3=e.clientX||e.touches[0].clientX;
+    pos4=e.clientY||e.touches[0].clientY;
+    el.style.top=(el.offsetTop-pos2)+'px';
+    el.style.left=(el.offsetLeft-pos1)+'px';
+  }
+  
+  function dragEnd(){
+    isDragging=false;
+    updateSignaturePosition(el);
+  }
+  
+  function resizeStart(e){
+    e.preventDefault();
+    e.stopPropagation();
+    isResizing=true;
+    pos3=e.clientX||e.touches[0].clientX;
+    pos4=e.clientY||e.touches[0].clientY;
+  }
+  
+  function resizeMove(e){
+    if(!isResizing)return;
+    e.preventDefault();
+    const clientX=e.clientX||e.touches[0].clientX;
+    const clientY=e.clientY||e.touches[0].clientY;
+    const dx=clientX-pos3;
+    const newWidth=el.offsetWidth+dx;
+    const newHeight=newWidth/aspectRatio;
+    pos3=clientX;
+    pos4=clientY;
+    el.style.width=newWidth+'px';
+    el.style.height=newHeight+'px';
+  }
+  
+  function resizeEnd(){
+    isResizing=false;
+    updateSignaturePosition(el);
+  }
+  
+  el.addEventListener('mousedown',dragStart);
+  el.addEventListener('touchstart',dragStart);
+  document.addEventListener('mousemove',dragMove);
+  document.addEventListener('touchmove',dragMove,{passive:false});
+  document.addEventListener('mouseup',dragEnd);
+  document.addEventListener('touchend',dragEnd);
+  
+  resizeHandle.addEventListener('mousedown',resizeStart);
+  resizeHandle.addEventListener('touchstart',resizeStart);
+  document.addEventListener('mousemove',resizeMove);
+  document.addEventListener('touchmove',resizeMove,{passive:false});
+  document.addEventListener('mouseup',resizeEnd);
+  document.addEventListener('touchend',resizeEnd);
+}
+
+function getSignaturePosition(el){
+  const canvas=pdfViewer.querySelector('canvas');
+  const canvasRect=canvas.getBoundingClientRect();
+  const pdfViewerRect=pdfViewer.getBoundingClientRect();
+  const leftOffset=(pdfViewerRect.width-canvasRect.width)/2;
+  return{
+    left:(parseFloat(el.style.left)-leftOffset)/canvas.width,
+    top:parseFloat(el.style.top)/canvas.height,
+    width:parseFloat(el.style.width)/canvas.width,
+    height:parseFloat(el.style.height)/canvas.height
+  }
+}
+
+function updateSignaturePosition(el){
+  const sig=signatures.find(s=>s.element===el);
+  if(sig){
+    sig.position=getSignaturePosition(el);
+  }
+}
+
+function renderSignatures(){
+  signatures.forEach(sig=>{if(sig.page===currentPage)pdfViewer.appendChild(sig.element);else if(sig.element.parentNode)sig.element.parentNode.removeChild(sig.element)})
+}
+
+document.getElementById('exportPDF').addEventListener('click',async()=>{
+  const pdfDoc=await PDFLib.PDFDocument.load(await pdf.getData());
+  for(let sig of signatures){
+    const page=pdfDoc.getPages()[sig.page-1],{width,height}=page.getSize(),imgData=sig.element.querySelector('img').src.split(',')[1],signatureImage=await pdfDoc.embedPng(imgData),scaledWidth=sig.position.width*width,scaledHeight=sig.position.height*height,x=sig.position.left*width,y=height-(sig.position.top*height)-scaledHeight;
+    page.drawImage(signatureImage,{x,y,width:scaledWidth,height:scaledHeight})
+  }
+  const pdfBytes=await pdfDoc.save(),blob=new Blob([pdfBytes],{type:'application/pdf'}),link=document.createElement('a');
+  link.href=URL.createObjectURL(blob);link.download='signed_document.pdf';link.click()
+});
+
+window.onresize=()=>renderPage(currentPage);
+</script>
+</body>
+</html>
