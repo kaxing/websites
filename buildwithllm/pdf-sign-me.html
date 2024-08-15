@@ -11,6 +11,7 @@ body{margin:0;font-family:Arial,sans-serif;overflow:hidden}
 #controls{position:fixed;bottom:0;left:0;right:0;background:#f0f0f0;padding:10px;display:flex;justify-content:space-between}
 .signature{position:absolute;cursor:move;border:1px solid #000;overflow:hidden;touch-action:none}
 .signature-remove{position:absolute;top:0;right:0;width:20px;height:20px;color:#000;text-align:center;line-height:20px;cursor:pointer;font-size:16px;font-weight:bold}
+.signature-resize{position:absolute;bottom:-5px;right:-5px;width:10px;height:10px;background:rgba(0,0,0,0.5);cursor:se-resize}
 #signatureModal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);justify-content:center;align-items:center}
 #signatureCanvas{background:white;border:1px solid #000}
 #signatureControls{margin-top:10px;text-align:center}
@@ -42,10 +43,6 @@ body{margin:0;font-family:Arial,sans-serif;overflow:hidden}
 <script>
 let pdf,currentPage=1,signatures=[],isDrawing=false,startX,startY;
 const dropZone=document.getElementById('dropZone'),pdfViewer=document.getElementById('pdfViewer'),controls=document.getElementById('controls'),pageInfo=document.getElementById('pageInfo'),signatureModal=document.getElementById('signatureModal'),signatureCanvas=document.getElementById('signatureCanvas'),signatureCtx=signatureCanvas.getContext('2d'),colorPicker=document.getElementById('colorPicker');
-
-const defaultColor = '#00008B';
-colorPicker.value = defaultColor;
-signatureCtx.strokeStyle = defaultColor;
 
 dropZone.addEventListener('click',()=>{const input=document.createElement('input');input.type='file';input.accept='.pdf';input.onchange=e=>{if(e.target.files[0])loadPDF(e.target.files[0])};input.click()});
 ['dragover','drop'].forEach(event=>dropZone.addEventListener(event,e=>{e.preventDefault();if(event==='drop'){const file=e.dataTransfer.files[0];if(file.type==='application/pdf')loadPDF(file)}}));
@@ -98,7 +95,7 @@ function draw(e){
 ['touchstart','touchmove','touchend'].forEach(event=>signatureCanvas.addEventListener(event,e=>{e.preventDefault();const touch=e.touches[0];if(event==='touchend')isDrawing=false;else if(event==='touchstart')startDrawing(touch);else draw(touch)}));
 
 document.getElementById('saveSignature').addEventListener('click',()=>{
-  const sig=document.createElement('div'),img=document.createElement('img'),removeBtn=document.createElement('div');
+  const sig=document.createElement('div'),img=document.createElement('img'),removeBtn=document.createElement('div'),resizeHandle=document.createElement('div');
   sig.className='signature';
   const canvas=pdfViewer.querySelector('canvas');
   const canvasRect=canvas.getBoundingClientRect();
@@ -107,20 +104,24 @@ document.getElementById('saveSignature').addEventListener('click',()=>{
   sig.style.cssText=`width:150px;height:75px;left:${leftOffset+10}px;top:10px;`;
   img.src=signatureCanvas.toDataURL();img.style.cssText='width:100%;height:100%;';
   removeBtn.className='signature-remove';removeBtn.textContent='×';
-  sig.appendChild(img);sig.appendChild(removeBtn);pdfViewer.appendChild(sig);
-  makeDraggable(sig);
+  resizeHandle.className='signature-resize';
+  sig.appendChild(img);sig.appendChild(removeBtn);sig.appendChild(resizeHandle);pdfViewer.appendChild(sig);
+  const aspectRatio = signatureCanvas.width / signatureCanvas.height;
+  makeDraggable(sig, aspectRatio);
   signatures.push({page:currentPage,element:sig,position:getSignaturePosition(sig)});
   signatureModal.style.display='none'
 });
 document.getElementById('cancelSignature').addEventListener('click',()=>signatureModal.style.display='none');
 
-function makeDraggable(el) {
-  let startX, startY, startWidth, startHeight, isResizing = false, isDragging = false;
-  const img = el.querySelector('img'),
-        aspectRatio = img.naturalWidth / img.naturalHeight,
-        resizeHandle = document.createElement('div');
-  resizeHandle.style.cssText = 'position:absolute;right:0;bottom:0;width:20px;height:20px;cursor:se-resize;';
-  el.appendChild(resizeHandle);
+function makeDraggable(el, aspectRatio) {
+  let isDragging = false, isResizing = false, startX, startY, startWidth, startHeight;
+
+  el.addEventListener('mousedown', dragStart);
+  el.addEventListener('touchstart', dragStart);
+  
+  const resizeHandle = el.querySelector('.signature-resize');
+  resizeHandle.addEventListener('mousedown', resizeStart);
+  resizeHandle.addEventListener('touchstart', resizeStart);
 
   function dragStart(e) {
     if (e.target.className === 'signature-remove') {
@@ -128,21 +129,22 @@ function makeDraggable(el) {
       signatures = signatures.filter(sig => sig.element !== el);
       return;
     }
+    if (e.target.className === 'signature-resize') return;
     e.preventDefault();
     isDragging = true;
-    startX = e.clientX || (e.touches && e.touches[0].clientX);
-    startY = e.clientY || (e.touches && e.touches[0].clientY);
-    document.addEventListener('mousemove', dragMove);
-    document.addEventListener('touchmove', dragMove, { passive: false });
+    startX = e.clientX || e.touches[0].clientX;
+    startY = e.clientY || e.touches[0].clientY;
+    document.addEventListener('mousemove', drag);
+    document.addEventListener('touchmove', drag);
     document.addEventListener('mouseup', dragEnd);
     document.addEventListener('touchend', dragEnd);
   }
 
-  function dragMove(e) {
+  function drag(e) {
     if (!isDragging) return;
     e.preventDefault();
-    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+    const clientX = e.clientX || e.touches[0].clientX;
+    const clientY = e.clientY || e.touches[0].clientY;
     const dx = clientX - startX;
     const dy = clientY - startY;
     el.style.left = `${el.offsetLeft + dx}px`;
@@ -153,53 +155,72 @@ function makeDraggable(el) {
 
   function dragEnd() {
     isDragging = false;
-    updateSignaturePosition(el);
-    document.removeEventListener('mousemove', dragMove);
-    document.removeEventListener('touchmove', dragMove);
+    document.removeEventListener('mousemove', drag);
+    document.removeEventListener('touchmove', drag);
     document.removeEventListener('mouseup', dragEnd);
     document.removeEventListener('touchend', dragEnd);
+    updateSignaturePosition(el);
   }
 
   function resizeStart(e) {
     e.preventDefault();
     e.stopPropagation();
     isResizing = true;
-    startX = e.clientX || (e.touches && e.touches[0].clientX);
-    startY = e.clientY || (e.touches && e.touches[0].clientY);
+    startX = e.clientX || e.touches[0].clientX;
+    startY = e.clientY || e.touches[0].clientY;
     startWidth = el.offsetWidth;
     startHeight = el.offsetHeight;
-    document.addEventListener('mousemove', resizeMove);
-    document.addEventListener('touchmove', resizeMove, { passive: false });
+    document.addEventListener('mousemove', resize);
+    document.addEventListener('touchmove', resize);
     document.addEventListener('mouseup', resizeEnd);
     document.addEventListener('touchend', resizeEnd);
   }
 
-  function resizeMove(e) {
+  function resize(e) {
     if (!isResizing) return;
     e.preventDefault();
-    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+    const clientX = e.clientX || e.touches[0].clientX;
+    const clientY = e.clientY || e.touches[0].clientY;
     const dx = clientX - startX;
     const dy = clientY - startY;
-    const newWidth = Math.max(50, Math.min(startWidth + dx, pdfViewer.offsetWidth * 0.8));
-    const newHeight = newWidth / aspectRatio;
+    
+    // Calculate new dimensions
+    let newWidth = Math.max(50, startWidth + dx);
+    let newHeight = Math.max(50, startHeight + dy);
+
+    // Determine which dimension changed more
+    if (Math.abs(dx) > Math.abs(dy)) {
+      // If width changed more, adjust height to maintain aspect ratio
+      newHeight = newWidth / aspectRatio;
+    } else {
+      // If height changed more, adjust width to maintain aspect ratio
+      newWidth = newHeight * aspectRatio;
+    }
+
+    // Ensure the signature stays within the PDF viewer
+    const maxWidth = pdfViewer.offsetWidth - el.offsetLeft;
+    const maxHeight = pdfViewer.offsetHeight - el.offsetTop;
+    if (newWidth > maxWidth) {
+      newWidth = maxWidth;
+      newHeight = newWidth / aspectRatio;
+    }
+    if (newHeight > maxHeight) {
+      newHeight = maxHeight;
+      newWidth = newHeight * aspectRatio;
+    }
+    
     el.style.width = `${newWidth}px`;
     el.style.height = `${newHeight}px`;
   }
 
   function resizeEnd() {
     isResizing = false;
-    updateSignaturePosition(el);
-    document.removeEventListener('mousemove', resizeMove);
-    document.removeEventListener('touchmove', resizeMove);
+    document.removeEventListener('mousemove', resize);
+    document.removeEventListener('touchmove', resize);
     document.removeEventListener('mouseup', resizeEnd);
     document.removeEventListener('touchend', resizeEnd);
+    updateSignaturePosition(el);
   }
-
-  el.addEventListener('mousedown', dragStart);
-  el.addEventListener('touchstart', dragStart);
-  resizeHandle.addEventListener('mousedown', resizeStart);
-  resizeHandle.addEventListener('touchstart', resizeStart);
 }
 
 function getSignaturePosition(el){
