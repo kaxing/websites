@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -19,31 +18,32 @@ textarea,input{width:100%;box-sizing:border-box;padding:5px;border:1px solid #cc
 #chatHistory{flex:1;overflow-y:auto;margin-bottom:10px;}
 #chatInput{padding:10px;border-top:1px solid #ccc;}
 #errorMessage{color:red;padding:10px;}
-button{padding:5px 10px;background:#007bff;color:#fff;border:none;border-radius:3px;cursor:pointer;position:relative;}
-button:hover{font-weight:bold;}
-.editableText{min-height:1em;border:1px solid transparent;padding:5px;border-radius:3px;display:inline;}
-.editableText:focus{border-color:#007bff;outline:none;}
+button{padding:5px 10px;background:#007bff;color:#fff;border:none;border-radius:3px;cursor:pointer;}
+button:hover{background:#0056b3;}
+.editableText{min-height:1em;border:1px solid transparent;padding:5px;border-radius:3px;display:inline-block;cursor:default;width:calc(100% - 10px);white-space:pre-wrap;word-wrap:break-word;}
+.editableText:focus{outline:none;}
+.editingMode{border:2px solid #007bff;border-radius:5px;padding:5px;cursor:text;}
 .messageRole{font-weight:bold;margin-right:5px;}
 #zeroshotHistory{margin-top:10px;max-height:300px;overflow-y:auto;}
-pre{background-color:#f4f4f4;border:1px solid #ddd;border-radius:3px;padding:10px;white-space:pre-wrap;word-wrap:break-word;font-family:monospace;margin:10px 0;}
-code{font-family:monospace;}
+pre{position:relative;background-color:#f4f4f4;border:1px solid #ddd;border-radius:3px;padding:10px;padding-top:25px;white-space:pre-wrap;word-wrap:break-word;font-family:monospace;margin:10px 0;}
+pre code{font-family:monospace;}
+.codeLanguage{font-size:0.8em;color:#888;position:absolute;top:0;left:0;padding:2px 5px;background:#f4f4f4;border-bottom-right-radius:3px;border-right:1px solid #ddd;border-bottom:1px solid #ddd;}
+.copyButton{position:absolute;top:5px;right:5px;background:white;color:#007bff;border:1px solid #007bff;border-radius:3px;padding:2px 5px;cursor:pointer;font-size:12px;}
+.previewButton{position:absolute;bottom:5px;right:5px;background:#28a745;color:white;border:none;border-radius:3px;padding:2px 5px;cursor:pointer;font-size:12px;}
+.copyButton:hover{background:#007bff;color:white;}
+.previewButton:hover{background:#218838;}
 @keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
 .loadingSpinner{display:inline-block;width:10px;height:10px;border:2px solid rgba(255,255,255,.3);border-radius:50%;border-top-color:#fff;animation:spin 1s ease-in-out infinite;margin-right:5px;}
 button:disabled{opacity:0.7;cursor:not-allowed;}
-.deleteMessageBtn{display:none;position:absolute;right:5px;top:5px;background:rgba(255,255,255,0.7);color:#ff4d4d;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;line-height:1;text-align:center;cursor:pointer;padding:0;align-items:center;justify-content:center;}
+.deleteMessageBtn{display:none;position:absolute;right:5px;top:5px;background:rgba(255,255,255,0.7);color:#ff4d4d;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;line-height:1;text-align:center;cursor:pointer;padding:0;}
 .chatRow:hover .deleteMessageBtn{display:flex;}
 .deleteMessageBtnContainer{display:none;position:absolute;right:0;top:0;bottom:0;width:30px;background:linear-gradient(to right, transparent, rgba(255,255,255,0.7));}
 .chatRow:hover .deleteMessageBtnContainer{display:block;}
-@media (max-width: 768px) {
-#mainContent{flex-direction:column;}
-#sidebar{border-top:1px solid #ccc;}
-}
+@media (max-width: 768px) {#mainContent{flex-direction:column;}#sidebar{border-top:1px solid #ccc;}}
 </style>
 </head>
 <body>
-<div id="apiKeySection">
-<input type="password" id="apiKeyInput" placeholder="Enter your API key" oninput="saveApiKey()">
-</div>
+<div id="apiKeySection"><input type="password" id="apiKeyInput" placeholder="Enter your API key" oninput="saveApiKey()"></div>
 <div id="mainContent">
 <div id="mainColumn">
 <div id="chatHistory"></div>
@@ -62,192 +62,7 @@ button:disabled{opacity:0.7;cursor:not-allowed;}
 </div>
 <div id="errorMessage"></div>
 <script>
-const apiUrl = 'https://api.openai.com/v1/chat/completions';
-let chatHistory = [];
-let zeroshotHistory = [];
-let isMainChatProcessing = false;
-let isZeroshotProcessing = false;
-
-let DEFAULT_SYSTEM_PROMPT = "Use less word, be concise and honest.";
-
-function saveApiKey() {
-const apiKey = document.getElementById('apiKeyInput').value;
-localStorage.setItem('simproChatApiKey', apiKey);
-}
-function getApiKey() {
-return localStorage.getItem('simproChatApiKey') || '';
-}
-function loadApiKey() {
-const apiKey = getApiKey();
-document.getElementById('apiKeyInput').value = apiKey;
-}
-async function fetchAIResponse(messages) {
-const apiKey = getApiKey();
-if (!apiKey) {
-throw new Error('API key not set. Please enter your API key.');
-}
-try {
-const headers = {
-'Content-Type': 'application/json',
-'Authorization': `Bearer ${apiKey}`
-};
-const body = {
-model: "gpt-4o",
-messages: messages,
-temperature: 1
-};
-const response = await fetch(apiUrl, {
-method: 'POST',
-headers: headers,
-body: JSON.stringify(body)
-});
-if (!response.ok) {
-const errorData = await response.json();
-throw new Error(`API error: ${errorData.error.message}`);
-}
-const data = await response.json();
-return data.choices[0].message.content;
-} catch (error) {
-console.error('Error:', error);
-throw error;
-}
-}
-function escapeHTML(text) {
-const div = document.createElement('div');
-div.textContent = text;
-return div.innerHTML;
-}
-function createMessageElement(content, role, index) {
-const div = document.createElement('div');
-div.className = `chatRow ${role}Message`;
-const formattedContent = content.replace(/```([\s\S]*?)```/g, function(match, code) {
-return `<pre><code>${escapeHTML(code)}</code></pre>`;
-});
-div.innerHTML = `<span class="messageRole">${role}:</span> <div class="editableText" contenteditable="true">${formattedContent}</div>`;
-div.querySelector('.editableText').addEventListener('blur', function() {
-if (index >= 0) {
-chatHistory[index].content = this.innerText;
-} else {
-DEFAULT_SYSTEM_PROMPT = this.innerText;
-}
-});
-
-if (index !== -1) {
-const deleteBtnContainer = document.createElement('div');
-deleteBtnContainer.className = 'deleteMessageBtnContainer';
-const deleteBtn = document.createElement('button');
-deleteBtn.className = 'deleteMessageBtn';
-deleteBtn.textContent = 'x';
-deleteBtn.onclick = function() {
-if (index >= 0) {
-chatHistory.splice(index, 1);
-} else {
-DEFAULT_SYSTEM_PROMPT = "Use less word, be concise and honest.";
-}
-updateChatDisplay();
-};
-deleteBtnContainer.appendChild(deleteBtn);
-div.appendChild(deleteBtnContainer);
-}
-
-return div;
-}
-function updateChatDisplay() {
-const chatHistoryDiv = document.getElementById('chatHistory');
-chatHistoryDiv.innerHTML = '';
-
-chatHistoryDiv.appendChild(createMessageElement(DEFAULT_SYSTEM_PROMPT, "system", -1));
-
-chatHistory.forEach((msg, index) => {
-chatHistoryDiv.appendChild(createMessageElement(msg.content, msg.role, index));
-});
-
-chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
-}
-function updateZeroshotDisplay() {
-const zeroshotHistoryDiv = document.getElementById('zeroshotHistory');
-zeroshotHistoryDiv.innerHTML = '';
-zeroshotHistory.forEach((item, index) => {
-const div = document.createElement('div');
-div.className = 'chatRow';
-div.innerHTML = `
-<div><strong>System:</strong> ${escapeHTML(item.system)}</div>
-<div><strong>User:</strong> ${escapeHTML(item.user)}</div>
-<div><strong>Assistant:</strong> ${escapeHTML(item.assistant)}</div>
-`;
-zeroshotHistoryDiv.appendChild(div);
-});
-zeroshotHistoryDiv.scrollTop = zeroshotHistoryDiv.scrollHeight;
-}
-function setButtonLoadingState(buttonId, isLoading) {
-const button = document.getElementById(buttonId);
-if (isLoading) {
-button.innerHTML = '<span class="loadingSpinner"></span>Sending...';
-button.disabled = true;
-} else {
-button.innerHTML = 'Send';
-button.disabled = false;
-}
-}
-async function sendMessage() {
-if (isMainChatProcessing) return;
-const userInput = document.getElementById('userInput');
-if (userInput.value.trim() === '') return;
-const userMessage = userInput.value;
-chatHistory.push({role: "user", content: userMessage});
-updateChatDisplay();
-userInput.value = '';
-try {
-isMainChatProcessing = true;
-setButtonLoadingState('sendButton', true);
-const response = await fetchAIResponse([{role: "system", content: DEFAULT_SYSTEM_PROMPT}, ...chatHistory]);
-chatHistory.push({role: "assistant", content: response});
-updateChatDisplay();
-} catch (error) {
-document.getElementById('errorMessage').textContent = `Error: ${error.message}`;
-} finally {
-isMainChatProcessing = false;
-setButtonLoadingState('sendButton', false);
-}
-}
-async function sendZeroshotQuery() {
-if (isZeroshotProcessing) return;
-const zeroshotSystemPrompt = document.getElementById('zeroshotSystemPrompt').value;
-const zeroshotInput = document.getElementById('zeroshotInput');
-if (zeroshotInput.value.trim() === '') return;
-const messages = [
-{role: "system", content: zeroshotSystemPrompt},
-{role: "user", content: zeroshotInput.value}
-];
-try {
-isZeroshotProcessing = true;
-setButtonLoadingState('zeroshotButton', true);
-const response = await fetchAIResponse(messages);
-zeroshotHistory.push({
-system: zeroshotSystemPrompt,
-user: zeroshotInput.value,
-assistant: response
-});
-updateZeroshotDisplay();
-zeroshotInput.value = '';
-} catch (error) {
-document.getElementById('errorMessage').textContent = `Error: ${error.message}`;
-} finally {
-isZeroshotProcessing = false;
-setButtonLoadingState('zeroshotButton', false);
-}
-}
-window.onload = function() {
-loadApiKey();
-updateChatDisplay();
-const userInput = document.getElementById('userInput');
-userInput.addEventListener('keydown', function(e) {
-if (e.key === 'Enter' && !e.shiftKey) {
-e.preventDefault();
-sendMessage();
-}
-});
-};
+const apiUrl='https://api.openai.com/v1/chat/completions';let chatHistory=[],zeroshotHistory=[],isMainChatProcessing=false,isZeroshotProcessing=false;let DEFAULT_SYSTEM_PROMPT="Use less word, be concise and honest.";function saveApiKey(){const apiKey=document.getElementById('apiKeyInput').value;localStorage.setItem('simproChatApiKey',apiKey);}function getApiKey(){return localStorage.getItem('simproChatApiKey')||'';}function loadApiKey(){const apiKey=getApiKey();document.getElementById('apiKeyInput').value=apiKey;}async function fetchAIResponse(messages){const apiKey=getApiKey();if(!apiKey){throw new Error('API key not set. Please enter your API key.');}try{const headers={'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`};const body={model:"gpt-4",messages:messages,temperature:1};const response=await fetch(apiUrl,{method:'POST',headers:headers,body:JSON.stringify(body)});if(!response.ok){const errorData=await response.json();throw new Error(`API error: ${errorData.error.message}`);}const data=await response.json();return data.choices[0].message.content;}catch(error){console.error('Error:',error);throw error;}}function escapeHTML(text){const div=document.createElement('div');div.textContent=text;return div.innerHTML;}function createMessageElement(content,role,index){const div=document.createElement('div');div.className=`chatRow ${role}Message`;let isEditing=false;const formattedContent=content.replace(/```(\w+)?\n([\s\S]*?)```/g,function(match,lang,code){const language=lang||'plaintext';return`<pre><div class="codeLanguage">${language}</div><code>${escapeHTML(code)}</code><button class="copyButton" onclick="copyCode(this)">Copy</button><button class="previewButton" onclick="previewHTML(this)">Preview</button></pre>`;});const editableDiv=document.createElement('div');editableDiv.className='editableText';editableDiv.contentEditable=true;editableDiv.innerHTML=`<span class="messageRole">${role}:</span> ${formattedContent}`;editableDiv.addEventListener('dblclick',function(e){if(!isEditing){isEditing=true;editableDiv.innerText=content;editableDiv.classList.add('editingMode');editableDiv.focus();e.stopPropagation();}});editableDiv.addEventListener('keydown',function(e){if(e.key==='Escape'){e.preventDefault();finishEditing();}});function finishEditing(){isEditing=false;content=editableDiv.innerText.trim();editableDiv.classList.remove('editingMode');editableDiv.innerHTML=`<span class="messageRole">${role}:</span> ${content.replace(/```(\w+)?\n([\s\S]*?)```/g,function(match,lang,code){const language=lang||'plaintext';return`<pre><div class="codeLanguage">${language}</div><code>${escapeHTML(code)}</code><button class="copyButton" onclick="copyCode(this)">Copy</button><button class="previewButton" onclick="previewHTML(this)">Preview</button></pre>`;})}`;if(index>=0){chatHistory[index].content=content;}else{DEFAULT_SYSTEM_PROMPT=content;}}document.addEventListener('click',function(e){if(isEditing&&!editableDiv.contains(e.target)){finishEditing();}});div.appendChild(editableDiv);if(index!==-1){const deleteBtnContainer=document.createElement('div');deleteBtnContainer.className='deleteMessageBtnContainer';const deleteBtn=document.createElement('button');deleteBtn.className='deleteMessageBtn';deleteBtn.textContent='x';deleteBtn.onclick=function(){if(index>=0){chatHistory.splice(index,1);}else{DEFAULT_SYSTEM_PROMPT="Use less word, be concise and honest.";}updateChatDisplay();};deleteBtnContainer.appendChild(deleteBtn);div.appendChild(deleteBtnContainer);}return div;}function copyCode(button){const codeBlock=button.closest('pre');const codeElement=codeBlock.querySelector('code');const codeContent=codeElement.textContent.trim();navigator.clipboard.writeText(codeContent);button.textContent='Copied';setTimeout(()=>button.textContent='Copy',1600);}function previewHTML(button){const codeBlock=button.closest('pre');const codeElement=codeBlock.querySelector('code');const htmlContent=codeElement.textContent.trim();const newWindow=window.open('','_blank');newWindow.document.write(htmlContent);newWindow.document.close();}function updateChatDisplay(){const chatHistoryDiv=document.getElementById('chatHistory');chatHistoryDiv.innerHTML='';chatHistoryDiv.appendChild(createMessageElement(DEFAULT_SYSTEM_PROMPT,"System",-1));chatHistory.forEach((msg,index)=>{chatHistoryDiv.appendChild(createMessageElement(msg.content,capitalizeFirstLetter(msg.role),index));});chatHistoryDiv.scrollTop=chatHistoryDiv.scrollHeight;}function capitalizeFirstLetter(string){return string.charAt(0).toUpperCase()+string.slice(1);}function updateZeroshotDisplay(){const zeroshotHistoryDiv=document.getElementById('zeroshotHistory');zeroshotHistoryDiv.innerHTML='';zeroshotHistory.forEach((item,index)=>{const div=document.createElement('div');div.className='chatRow';div.innerHTML=`<div><strong>System:</strong> ${escapeHTML(item.system)}</div><div><strong>User:</strong> ${escapeHTML(item.user)}</div><div><strong>Assistant:</strong> ${escapeHTML(item.assistant)}</div>`;zeroshotHistoryDiv.appendChild(div);});zeroshotHistoryDiv.scrollTop=zeroshotHistoryDiv.scrollHeight;}function setButtonLoadingState(buttonId,isLoading){const button=document.getElementById(buttonId);if(isLoading){button.innerHTML='<span class="loadingSpinner"></span>Sending...';button.disabled=true;}else{button.innerHTML='Send';button.disabled=false;}}async function sendMessage(){if(isMainChatProcessing)return;const userInput=document.getElementById('userInput');if(userInput.value.trim()==='')return;const userMessage=userInput.value;chatHistory.push({role:"user",content:userMessage});updateChatDisplay();userInput.value='';try{isMainChatProcessing=true;setButtonLoadingState('sendButton',true);const response=await fetchAIResponse([{role:"system",content:DEFAULT_SYSTEM_PROMPT},...chatHistory]);chatHistory.push({role:"assistant",content:response});updateChatDisplay();}catch(error){document.getElementById('errorMessage').textContent=`Error: ${error.message}`;}finally{isMainChatProcessing=false;setButtonLoadingState('sendButton',false);}}async function sendZeroshotQuery(){if(isZeroshotProcessing)return;const zeroshotSystemPrompt=document.getElementById('zeroshotSystemPrompt').value;const zeroshotInput=document.getElementById('zeroshotInput');if(zeroshotInput.value.trim()==='')return;const messages=[{role:"system",content:zeroshotSystemPrompt},{role:"user",content:zeroshotInput.value}];try{isZeroshotProcessing=true;setButtonLoadingState('zeroshotButton',true);const response=await fetchAIResponse(messages);zeroshotHistory.push({system:zeroshotSystemPrompt,user:zeroshotInput.value,assistant:response});updateZeroshotDisplay();zeroshotInput.value='';}catch(error){document.getElementById('errorMessage').textContent=`Error: ${error.message}`;}finally{isZeroshotProcessing=false;setButtonLoadingState('zeroshotButton',false);}}window.onload=function(){loadApiKey();updateChatDisplay();const userInput=document.getElementById('userInput');userInput.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}});}
 </script>
 </body>
 </html>
