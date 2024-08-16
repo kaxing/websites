@@ -1,0 +1,253 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SimProChat</title>
+<style>
+body{font-family:Arial,sans-serif;margin:0;padding:0;display:flex;flex-direction:column;height:100vh;background:#f0f0f0;}
+#apiKeySection{padding:10px;background:#e0e0e0;border-bottom:1px solid #ccc;}
+#mainContent{display:flex;flex:1;overflow:hidden;}
+#mainColumn{flex:3;display:flex;flex-direction:column;padding:10px;background:#fff;border-right:1px solid #ccc;}
+#sidebar{flex:1;padding:10px;display:flex;flex-direction:column;overflow-y:auto;background:#fff;}
+.chatRow{margin-bottom:10px;padding:10px;border-radius:5px;position:relative;}
+.systemMessage{background:#e6f3ff;}
+.userMessage{background:#e6ffe6;}
+.assistantMessage{background:#fff0f0;}
+textarea,input{width:100%;box-sizing:border-box;padding:5px;border:1px solid #ccc;border-radius:3px;margin-bottom:5px;}
+#chatHistory{flex:1;overflow-y:auto;margin-bottom:10px;}
+#chatInput{padding:10px;border-top:1px solid #ccc;}
+#errorMessage{color:red;padding:10px;}
+button{padding:5px 10px;background:#007bff;color:#fff;border:none;border-radius:3px;cursor:pointer;position:relative;}
+button:hover{font-weight:bold;}
+.editableText{min-height:1em;border:1px solid transparent;padding:5px;border-radius:3px;display:inline;}
+.editableText:focus{border-color:#007bff;outline:none;}
+.messageRole{font-weight:bold;margin-right:5px;}
+#zeroshotHistory{margin-top:10px;max-height:300px;overflow-y:auto;}
+pre{background-color:#f4f4f4;border:1px solid #ddd;border-radius:3px;padding:10px;white-space:pre-wrap;word-wrap:break-word;font-family:monospace;margin:10px 0;}
+code{font-family:monospace;}
+@keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
+.loadingSpinner{display:inline-block;width:10px;height:10px;border:2px solid rgba(255,255,255,.3);border-radius:50%;border-top-color:#fff;animation:spin 1s ease-in-out infinite;margin-right:5px;}
+button:disabled{opacity:0.7;cursor:not-allowed;}
+.deleteMessageBtn{display:none;position:absolute;right:5px;top:5px;background:rgba(255,255,255,0.7);color:#ff4d4d;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;line-height:1;text-align:center;cursor:pointer;padding:0;align-items:center;justify-content:center;}
+.chatRow:hover .deleteMessageBtn{display:flex;}
+.deleteMessageBtnContainer{display:none;position:absolute;right:0;top:0;bottom:0;width:30px;background:linear-gradient(to right, transparent, rgba(255,255,255,0.7));}
+.chatRow:hover .deleteMessageBtnContainer{display:block;}
+@media (max-width: 768px) {
+#mainContent{flex-direction:column;}
+#sidebar{border-top:1px solid #ccc;}
+}
+</style>
+</head>
+<body>
+<div id="apiKeySection">
+<input type="password" id="apiKeyInput" placeholder="Enter your API key" oninput="saveApiKey()">
+</div>
+<div id="mainContent">
+<div id="mainColumn">
+<div id="chatHistory"></div>
+<div id="chatInput">
+<textarea id="userInput" rows="3" placeholder="Enter your message... (Press Enter to send, Shift+Enter for new line)"></textarea>
+<button id="sendButton" onclick="sendMessage()">Send</button>
+</div>
+</div>
+<div id="sidebar">
+<h3>Zero-shot Query</h3>
+<input type="text" id="zeroshotSystemPrompt" placeholder="System prompt" value="Explain this to me briefly">
+<textarea id="zeroshotInput" rows="5" placeholder="Enter your zero-shot query..."></textarea>
+<button id="zeroshotButton" onclick="sendZeroshotQuery()">Send Zero-shot</button>
+<div id="zeroshotHistory"></div>
+</div>
+</div>
+<div id="errorMessage"></div>
+<script>
+const apiUrl = 'https://api.openai.com/v1/chat/completions';
+let chatHistory = [];
+let zeroshotHistory = [];
+let isMainChatProcessing = false;
+let isZeroshotProcessing = false;
+
+let DEFAULT_SYSTEM_PROMPT = "Use less word, be concise and honest.";
+
+function saveApiKey() {
+const apiKey = document.getElementById('apiKeyInput').value;
+localStorage.setItem('simproChatApiKey', apiKey);
+}
+function getApiKey() {
+return localStorage.getItem('simproChatApiKey') || '';
+}
+function loadApiKey() {
+const apiKey = getApiKey();
+document.getElementById('apiKeyInput').value = apiKey;
+}
+async function fetchAIResponse(messages) {
+const apiKey = getApiKey();
+if (!apiKey) {
+throw new Error('API key not set. Please enter your API key.');
+}
+try {
+const headers = {
+'Content-Type': 'application/json',
+'Authorization': `Bearer ${apiKey}`
+};
+const body = {
+model: "gpt-4o",
+messages: messages,
+temperature: 1
+};
+const response = await fetch(apiUrl, {
+method: 'POST',
+headers: headers,
+body: JSON.stringify(body)
+});
+if (!response.ok) {
+const errorData = await response.json();
+throw new Error(`API error: ${errorData.error.message}`);
+}
+const data = await response.json();
+return data.choices[0].message.content;
+} catch (error) {
+console.error('Error:', error);
+throw error;
+}
+}
+function escapeHTML(text) {
+const div = document.createElement('div');
+div.textContent = text;
+return div.innerHTML;
+}
+function createMessageElement(content, role, index) {
+const div = document.createElement('div');
+div.className = `chatRow ${role}Message`;
+const formattedContent = content.replace(/```([\s\S]*?)```/g, function(match, code) {
+return `<pre><code>${escapeHTML(code)}</code></pre>`;
+});
+div.innerHTML = `<span class="messageRole">${role}:</span> <div class="editableText" contenteditable="true">${formattedContent}</div>`;
+div.querySelector('.editableText').addEventListener('blur', function() {
+if (index >= 0) {
+chatHistory[index].content = this.innerText;
+} else {
+DEFAULT_SYSTEM_PROMPT = this.innerText;
+}
+});
+
+if (index !== -1) {
+const deleteBtnContainer = document.createElement('div');
+deleteBtnContainer.className = 'deleteMessageBtnContainer';
+const deleteBtn = document.createElement('button');
+deleteBtn.className = 'deleteMessageBtn';
+deleteBtn.textContent = 'x';
+deleteBtn.onclick = function() {
+if (index >= 0) {
+chatHistory.splice(index, 1);
+} else {
+DEFAULT_SYSTEM_PROMPT = "Use less word, be concise and honest.";
+}
+updateChatDisplay();
+};
+deleteBtnContainer.appendChild(deleteBtn);
+div.appendChild(deleteBtnContainer);
+}
+
+return div;
+}
+function updateChatDisplay() {
+const chatHistoryDiv = document.getElementById('chatHistory');
+chatHistoryDiv.innerHTML = '';
+
+chatHistoryDiv.appendChild(createMessageElement(DEFAULT_SYSTEM_PROMPT, "system", -1));
+
+chatHistory.forEach((msg, index) => {
+chatHistoryDiv.appendChild(createMessageElement(msg.content, msg.role, index));
+});
+
+chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
+}
+function updateZeroshotDisplay() {
+const zeroshotHistoryDiv = document.getElementById('zeroshotHistory');
+zeroshotHistoryDiv.innerHTML = '';
+zeroshotHistory.forEach((item, index) => {
+const div = document.createElement('div');
+div.className = 'chatRow';
+div.innerHTML = `
+<div><strong>System:</strong> ${escapeHTML(item.system)}</div>
+<div><strong>User:</strong> ${escapeHTML(item.user)}</div>
+<div><strong>Assistant:</strong> ${escapeHTML(item.assistant)}</div>
+`;
+zeroshotHistoryDiv.appendChild(div);
+});
+zeroshotHistoryDiv.scrollTop = zeroshotHistoryDiv.scrollHeight;
+}
+function setButtonLoadingState(buttonId, isLoading) {
+const button = document.getElementById(buttonId);
+if (isLoading) {
+button.innerHTML = '<span class="loadingSpinner"></span>Sending...';
+button.disabled = true;
+} else {
+button.innerHTML = 'Send';
+button.disabled = false;
+}
+}
+async function sendMessage() {
+if (isMainChatProcessing) return;
+const userInput = document.getElementById('userInput');
+if (userInput.value.trim() === '') return;
+const userMessage = userInput.value;
+chatHistory.push({role: "user", content: userMessage});
+updateChatDisplay();
+userInput.value = '';
+try {
+isMainChatProcessing = true;
+setButtonLoadingState('sendButton', true);
+const response = await fetchAIResponse([{role: "system", content: DEFAULT_SYSTEM_PROMPT}, ...chatHistory]);
+chatHistory.push({role: "assistant", content: response});
+updateChatDisplay();
+} catch (error) {
+document.getElementById('errorMessage').textContent = `Error: ${error.message}`;
+} finally {
+isMainChatProcessing = false;
+setButtonLoadingState('sendButton', false);
+}
+}
+async function sendZeroshotQuery() {
+if (isZeroshotProcessing) return;
+const zeroshotSystemPrompt = document.getElementById('zeroshotSystemPrompt').value;
+const zeroshotInput = document.getElementById('zeroshotInput');
+if (zeroshotInput.value.trim() === '') return;
+const messages = [
+{role: "system", content: zeroshotSystemPrompt},
+{role: "user", content: zeroshotInput.value}
+];
+try {
+isZeroshotProcessing = true;
+setButtonLoadingState('zeroshotButton', true);
+const response = await fetchAIResponse(messages);
+zeroshotHistory.push({
+system: zeroshotSystemPrompt,
+user: zeroshotInput.value,
+assistant: response
+});
+updateZeroshotDisplay();
+zeroshotInput.value = '';
+} catch (error) {
+document.getElementById('errorMessage').textContent = `Error: ${error.message}`;
+} finally {
+isZeroshotProcessing = false;
+setButtonLoadingState('zeroshotButton', false);
+}
+}
+window.onload = function() {
+loadApiKey();
+updateChatDisplay();
+const userInput = document.getElementById('userInput');
+userInput.addEventListener('keydown', function(e) {
+if (e.key === 'Enter' && !e.shiftKey) {
+e.preventDefault();
+sendMessage();
+}
+});
+};
+</script>
+</body>
+</html>
