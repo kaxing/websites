@@ -113,7 +113,7 @@ async function sendZeroshotQuery(){if(isZeroshotProcessing)return; const zerosho
   catch(error){document.getElementById('errorMessage').textContent=`Error: ${error.message}`;}
   finally {isZeroshotProcessing=false; setButtonLoadingState('zeroshotButton',false);}
 }
-function setButtonLoadingState(buttonId,isLoading){const button=document.getElementById(buttonId); button.innerHTML=isLoading?'<span class="loadingSpinner"></span>':'Send'; button.disabled=isLoading;} 
+const setButtonLoadingState = (buttonId, isLoading) => { const button = document.getElementById(buttonId); button.disabled = isLoading; isLoading ? (button.dataset.text = button.innerHTML, button.innerHTML = '<span class="loadingSpinner"></span>') : button.innerHTML = button.dataset.text; };
 async function fetchAIResponse(messages){const apiKey=getApiKey(); if(!apiKey)throw new Error('API key not set. Please enter your API key.'); 
   const response=await fetch(apiUrl,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},body:JSON.stringify({model:"chatgpt-4o-latest",messages:messages,temperature:1})}); 
   if(!response.ok){const errorData=await response.json(); throw new Error(`API error: ${errorData.error.message}`);} 
