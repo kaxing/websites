@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>faviconist</title>
+    <link href="https://unpkg.com/carbon-components/css/carbon-components.min.css" rel="stylesheet">
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #f4f4f4;
+            font-family: 'IBM Plex Sans', sans-serif;
+        }
+
+        .app {
+            width: 90%;
+            max-width: 1200px;
+            background: #fff;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .main-content {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .canvas-container {
+            position: relative;
+            width: 90%;
+            padding-bottom: 90%;
+        }
+
+        #paintArea, #gridCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #gridCanvas {
+            pointer-events: none;
+        }
+
+        .side-panel {
+            display: flex;
+            align-items: center;
+            width: 10%;
+        }
+
+        #previewCanvas {
+            width: 40px;
+            height: 40px;
+            image-rendering: pixelated;
+            border: 1px solid #8d8d8d;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .control-group {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        #colorPickerContainer {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+        }
+
+        #colorPicker, #sizeSlider {
+            flex-grow: 1;
+            height: 36px;
+            appearance: none;
+            cursor: pointer;
+            border-radius: 0.5em;
+            background: #e8e8e8;
+            padding: 0 10px;
+            border: 1px solid #e8e8e8;
+            box-shadow: 6px 6px 12px #c5c5c5, -6px -6px 12px #ffffff;
+            transition: all 0.3s;
+        }
+
+        #sizeSlider::-webkit-slider-thumb {
+            border: 1px solid #e8e8e8;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #090909;
+            cursor: pointer;
+            box-shadow: 6px 6px 12px #c5c5c5, -6px -6px 12px #ffffff;
+            -webkit-appearance: none;
+        }
+
+        #sizeSlider::-moz-range-thumb {
+            border: 1px solid #e8e8e8;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #090909;
+            cursor: pointer;
+            box-shadow: 6px 6px 12px #c5c5c5, -6px -6px 12px #ffffff;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+        }
+
+        button {
+            color: #090909;
+            padding: 0.7em 1.7em;
+            font-size: 18px;
+            border-radius: 0.5em;
+            background: #e8e8e8;
+            cursor: pointer;
+            border: 1px solid #e8e8e8;
+            transition: all 0.3s;
+            box-shadow: 6px 6px 12px #c5c5c5, -6px -6px 12px #ffffff;
+        }
+
+        button:hover {
+            background: #d1d1d1;
+            border-color: #c7c7c7;
+            box-shadow: 4px 4px 10px #c1c1c1, -4px -4px 10px #ffffff;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app">
+        <h1>faviconist</h1>
+        <div class="main-content">
+            <div class="canvas-container">
+                <canvas id="paintArea"></canvas>
+                <canvas id="gridCanvas"></canvas>
+            </div>
+            <div class="side-panel">
+                <canvas id="previewCanvas"></canvas>
+            </div>
+        </div>
+        <div class="controls">
+            <div class="control-row">
+                <div class="control-group">
+                    <label for="sizeSlider">Size: <span id="sizeValue">64</span>x<span id="sizeValue2">64</span></label>
+                    <input id="sizeSlider" type="range" min="16" max="512" value="64" step="16">
+                </div>
+                <div class="control-group">
+                    <label for="colorPicker">Color <span id="selectedColor">#007bff</span></label>
+                    <div id="colorPickerContainer">
+                        <input id="colorPicker" type="color" value="#007bff">
+                    </div>
+                </div>
+            </div>
+            <div class="button-group">
+                <button id="clear">Clear</button>
+                <button id="toggleGrid">Toggle Grid</button>
+                <button id="save">Export Favicon</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const paintArea = document.getElementById('paintArea');
+            const ctx = paintArea.getContext('2d');
+            const gridCanvas = document.getElementById('gridCanvas');
+            const gridCtx = gridCanvas.getContext('2d');
+            const previewCanvas = document.getElementById('previewCanvas');
+            const previewCtx = previewCanvas.getContext('2d');
+            const sizeSlider = document.getElementById('sizeSlider');
+            const sizeValue = document.getElementById('sizeValue');
+            const sizeValue2 = document.getElementById('sizeValue2');
+            const colorPicker = document.getElementById('colorPicker');
+            const selectedColor = document.getElementById('selectedColor');
+            const clearBtn = document.getElementById('clear');
+            const saveBtn = document.getElementById('save');
+            const toggleGridBtn = document.getElementById('toggleGrid');
+
+            const CANVAS_SIZE = 512;
+            const PREVIEW_SIZE = 40;
+            let iconSize = 64;
+            let isDrawing = false;
+            let showGrid = true;
+
+            function initializeCanvases() {
+                paintArea.width = gridCanvas.width = CANVAS_SIZE;
+                paintArea.height = gridCanvas.height = CANVAS_SIZE;
+                previewCanvas.width = previewCanvas.height = PREVIEW_SIZE;
+                clearCanvas();
+                drawGrid();
+            }
+
+            function clearCanvas() {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+                updatePreview();
+            }
+
+            function drawGrid() {
+                gridCtx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+                if (!showGrid) return;
+                const cellSize = CANVAS_SIZE / iconSize;
+                gridCtx.strokeStyle = 'rgba(141, 141, 141, 0.3)';
+                gridCtx.lineWidth = 1;
+                for (let i = 0; i <= iconSize; i++) {
+                    const pos = i * cellSize;
+                    gridCtx.beginPath();
+                    gridCtx.moveTo(pos, 0);
+                    gridCtx.lineTo(pos, CANVAS_SIZE);
+                    gridCtx.moveTo(0, pos);
+                    gridCtx.lineTo(CANVAS_SIZE, pos);
+                    gridCtx.stroke();
+                }
+            }
+
+            function updateIconSize() {
+                iconSize = parseInt(sizeSlider.value);
+                sizeValue.textContent = sizeValue2.textContent = iconSize;
+                drawGrid();
+            }
+
+            function draw(e) {
+                if (!isDrawing) return;
+                const rect = paintArea.getBoundingClientRect();
+                const scaleX = CANVAS_SIZE / rect.width;
+                const scaleY = CANVAS_SIZE / rect.height;
+                const x = (e.clientX - rect.left) * scaleX;
+                const y = (e.clientY - rect.top) * scaleY;
+                const cellSize = CANVAS_SIZE / iconSize;
+                const cellX = Math.floor(x / cellSize) * cellSize;
+                const cellY = Math.floor(y / cellSize) * cellSize;
+                ctx.fillStyle = colorPicker.value;
+                ctx.fillRect(cellX, cellY, cellSize, cellSize);
+                updatePreview();
+            }
+
+            function updatePreview() {
+                previewCtx.imageSmoothingEnabled = false;
+                previewCtx.clearRect(0, 0, PREVIEW_SIZE, PREVIEW_SIZE);
+                previewCtx.drawImage(paintArea, 0, 0, PREVIEW_SIZE, PREVIEW_SIZE);
+            }
+
+            function updateColorCode() {
+                selectedColor.textContent = colorPicker.value;
+            }
+
+            function saveFavicon() {
+                const originalSize = iconSize;
+                const sizes = [];
+                let currentSize = originalSize;
+
+                while (currentSize >= 16) {
+                    sizes.push(currentSize);
+                    currentSize = Math.floor(currentSize / 2);
+                }
+
+                const icoParts = sizes.map(size => {
+                    const resizedCanvas = document.createElement('canvas');
+                    resizedCanvas.width = resizedCanvas.height = size;
+                    const resizedCtx = resizedCanvas.getContext('2d');
+                    resizedCtx.imageSmoothingEnabled = false;
+                    resizedCtx.drawImage(paintArea, 0, 0, size, size);
+
+                    const imageData = resizedCtx.getImageData(0, 0, size, size);
+
+                    // Inverting the data for ICO format
+                    const invertedData = invertImageData(imageData);
+
+                    return createICOPart(invertedData, size);
+                });
+
+                const icoData = createICOFile(icoParts);
+                const blob = new Blob([icoData], { type: 'image/x-icon' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'favicon.ico';
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+
+            function invertImageData(imageData) {
+                const { width, height, data } = imageData;
+                const newData = new Uint8ClampedArray(data.length);
+
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        const srcIndex = (y * width + x) * 4;
+                        const destIndex = ((height - 1 - y) * width + x) * 4;
+                        newData[destIndex] = data[srcIndex];
+                        newData[destIndex + 1] = data[srcIndex + 1];
+                        newData[destIndex + 2] = data[srcIndex + 2];
+                        newData[destIndex + 3] = data[srcIndex + 3];
+                    }
+                }
+
+                return new ImageData(newData, width, height);
+            }
+
+            function createICOPart(imageData, size) {
+                const { data } = imageData;
+                const xor = new Uint8Array(size * size * 4);
+                const and = new Uint8Array(Math.ceil(size * size / 8));
+                for (let y = 0; y < size; y++) {
+                    for (let x = 0; x < size; x++) {
+                        const i = (y * size + x) * 4;
+                        xor.set([data[i + 2], data[i + 1], data[i], data[i + 3]], i);
+                        if (data[i + 3] === 0) {
+                            and[(y * size + x) >> 3] |= 1 << (7 - (x % 8));
+                        }
+                    }
+                }
+                return { width: size, height: size, xor, and };
+            }
+
+            function createICOFile(parts) {
+                const fileSize = 6 + parts.length * 16 + parts.reduce((sum, part) => sum + 40 + part.xor.length + part.and.length, 0);
+                const buffer = new ArrayBuffer(fileSize);
+                const view = new DataView(buffer);
+
+                view.setUint16(0, 0, true);
+                view.setUint16(2, 1, true);
+                view.setUint16(4, parts.length, true);
+
+                let offset = 6 + parts.length * 16;
+
+                parts.forEach((part, index) => {
+                    view.setUint8(6 + index * 16, part.width);
+                    view.setUint8(7 + index * 16, part.height);
+                    view.setUint8(8 + index * 16, 0);
+                    view.setUint8(9 + index * 16, 0);
+                    view.setUint16(10 + index * 16, 1, true);
+                    view.setUint16(12 + index * 16, 32, true);
+                    view.setUint32(14 + index * 16, 40 + part.xor.length + part.and.length, true);
+                    view.setUint32(18 + index * 16, offset, true);
+
+                    view.setUint32(offset, 40, true);
+                    view.setInt32(offset + 4, part.width, true);
+                    view.setInt32(offset + 8, part.height * 2, true);
+                    view.setUint16(offset + 12, 1, true);
+                    view.setUint16(offset + 14, 32, true);
+                    view.setUint32(offset + 16, 0, true);
+                    view.setUint32(offset + 20, 0, true);
+                    view.setUint32(offset + 24, 0, true);
+                    view.setUint32(offset + 28, 0, true);
+                    view.setUint32(offset + 32, 0, true);
+                    view.setUint32(offset + 36, 0, true);
+
+                    offset += 40;
+                    new Uint8Array(buffer, offset, part.xor.length).set(part.xor);
+                    offset += part.xor.length;
+                    new Uint8Array(buffer, offset, part.and.length).set(part.and);
+                    offset += part.and.length;
+                });
+
+                return buffer;
+            }
+
+            sizeSlider.addEventListener('input', updateIconSize);
+            colorPicker.addEventListener('input', updateColorCode);
+            paintArea.addEventListener('mousedown', () => isDrawing = true);
+            paintArea.addEventListener('mousemove', draw);
+            paintArea.addEventListener('mouseup', () => isDrawing = false);
+            paintArea.addEventListener('mouseleave', () => isDrawing = false);
+            clearBtn.addEventListener('click', clearCanvas);
+            saveBtn.addEventListener('click', saveFavicon);
+            toggleGridBtn.addEventListener('click', () => { showGrid = !showGrid; drawGrid(); });
+
+            initializeCanvases();
+            updateIconSize();
+        })();
+    </script>
+</body>
+
+</html>
