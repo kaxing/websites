@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>faviconist</title>
-    <link href="https://unpkg.com/carbon-components/css/carbon-components.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anek+Latin:wght@300&family=Nova+Square&family=Sen:wght@500&display=swap" rel="stylesheet">
     <style>
         body, html {
             height: 100%;
@@ -13,7 +15,7 @@
             justify-content: center;
             align-items: center;
             background: #f4f4f4;
-            font-family: 'IBM Plex Sans', sans-serif;
+            font-family: 'Nova Square', sans-serif;
         }
 
         .app {
@@ -74,12 +76,12 @@
         }
 
         .control-row {
-            display: flex;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             gap: 10px;
         }
 
         .control-group {
-            flex: 1;
             display: flex;
             flex-direction: column;
         }
@@ -92,47 +94,54 @@
         #colorPickerContainer {
             display: flex;
             align-items: center;
-            gap: 10px;
             width: 100%;
         }
 
         #colorPicker, #sizeSlider {
-            flex-grow: 1;
             height: 36px;
             appearance: none;
             cursor: pointer;
             border-radius: 0.5em;
             background: #e8e8e8;
-            padding: 0 10px;
             border: 1px solid #e8e8e8;
             box-shadow: 6px 6px 12px #c5c5c5, -6px -6px 12px #ffffff;
             transition: all 0.3s;
         }
 
+        #colorPicker {
+            padding: 2px;
+            width: 100%;
+        }
+
+        #sizeSlider {
+            padding: 0 10px;
+            width: 85%;
+        }
+
         #sizeSlider::-webkit-slider-thumb {
-            border: 1px solid #e8e8e8;
-            height: 18px;
+            -webkit-appearance: none;
             width: 18px;
+            height: 18px;
             border-radius: 50%;
             background: #090909;
             cursor: pointer;
-            box-shadow: 6px 6px 12px #c5c5c5, -6px -6px 12px #ffffff;
-            -webkit-appearance: none;
+            border: 1px solid #e8e8e8;
+            box-shadow: 0 0 2px rgba(0, 0, 0, 0.2);
         }
 
         #sizeSlider::-moz-range-thumb {
-            border: 1px solid #e8e8e8;
-            height: 18px;
             width: 18px;
+            height: 18px;
             border-radius: 50%;
             background: #090909;
             cursor: pointer;
-            box-shadow: 6px 6px 12px #c5c5c5, -6px -6px 12px #ffffff;
+            border: 1px solid #e8e8e8;
+            box-shadow: 0 0 2px rgba(0, 0, 0, 0.2);
         }
 
         .button-group {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-columns: 1fr 1fr;
             gap: 10px;
         }
 
@@ -152,6 +161,36 @@
             background: #d1d1d1;
             border-color: #c7c7c7;
             box-shadow: 4px 4px 10px #c1c1c1, -4px -4px 10px #ffffff;
+        }
+
+        .button-group button:last-child {
+            grid-column: 1 / -1;
+        }
+
+        @media (max-width: 768px) {
+            .app {
+                width: 95%;
+                padding: 10px;
+            }
+
+            .main-content {
+                flex-direction: column;
+            }
+
+            .canvas-container {
+                width: 100%;
+                padding-bottom: 100%;
+            }
+
+            .side-panel {
+                width: 100%;
+                justify-content: center;
+                margin-bottom: 10px;
+            }
+
+            .control-row, .button-group {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -182,10 +221,11 @@
                 </div>
             </div>
             <div class="button-group">
-                <button id="clear">Clear</button>
                 <button id="toggleGrid">Toggle Grid</button>
+                <button id="clear">Clear</button>
                 <button id="save">Export Favicon</button>
             </div>
+        </div>
         </div>
     </div>
 
@@ -250,7 +290,6 @@
             }
 
             function draw(e) {
-                if (!isDrawing) return;
                 const rect = paintArea.getBoundingClientRect();
                 const scaleX = CANVAS_SIZE / rect.width;
                 const scaleY = CANVAS_SIZE / rect.height;
@@ -293,7 +332,6 @@
 
                     const imageData = resizedCtx.getImageData(0, 0, size, size);
 
-                    // Inverting the data for ICO format
                     const invertedData = invertImageData(imageData);
 
                     return createICOPart(invertedData, size);
@@ -388,18 +426,26 @@
 
             sizeSlider.addEventListener('input', updateIconSize);
             colorPicker.addEventListener('input', updateColorCode);
-            paintArea.addEventListener('mousedown', () => isDrawing = true);
-            paintArea.addEventListener('mousemove', draw);
+            paintArea.addEventListener('mousedown', () => {
+                isDrawing = true;
+                draw(event);
+            });
+            paintArea.addEventListener('mousemove', (e) => {
+                if (isDrawing) draw(e);
+            });
             paintArea.addEventListener('mouseup', () => isDrawing = false);
             paintArea.addEventListener('mouseleave', () => isDrawing = false);
+            paintArea.addEventListener('click', draw); // Enable click-to-paint
             clearBtn.addEventListener('click', clearCanvas);
             saveBtn.addEventListener('click', saveFavicon);
-            toggleGridBtn.addEventListener('click', () => { showGrid = !showGrid; drawGrid(); });
+            toggleGridBtn.addEventListener('click', () => {
+                showGrid = !showGrid;
+                drawGrid();
+            });
 
             initializeCanvases();
             updateIconSize();
         })();
     </script>
 </body>
-
 </html>
