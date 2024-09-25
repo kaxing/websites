@@ -16,7 +16,9 @@
     <h1>智慧時代 / The Intelligence Age</h1>
     <div id="content"></div>
     <script>
-        const paragraphs = [
+document.addEventListener("DOMContentLoaded", function() {
+    const paragraphs = [
+    
     {
         "zh": "２０２４年９月２３日",
         "en": "September 23, 2024"
@@ -63,7 +65,7 @@
     },
     {
         "zh": "就是這樣；人類發現了一種真正能學習任何數據分佈（或者說，產生任何數據分佈的底層「規則」）的演算法。令人震驚的是，可用的計算能力和數據越多，它在幫助人們解決難題方面就越好。我發現無論我花多少時間思考這個問題，我都無法真正內化它有多麼重要。",
-        "en": "That's really it; humanity discovered an algorithm that could really, truly learn any distribution of data (or really, the underlying "rules" that produce any distribution of data). To a shocking degree of precision, the more compute and data available, the better it gets at helping people solve hard problems. I find that no matter how much time I spend thinking about this, I can never really internalize how consequential it is."
+        "en": "That's really it; humanity discovered an algorithm that could really, truly learn any distribution of data (or really, the underlying \"rules\" that produce any distribution of data). To a shocking degree of precision, the more compute and data available, the better it gets at helping people solve hard problems. I find that no matter how much time I spend thinking about this, I can never really internalize how consequential it is."
     },
     {
         "zh": "我們還有很多細節需要弄清楚，但被任何特定的挑戰分心是一個錯誤。深度學習是有效的，我們會解決剩下的問題。我們可以說很多關於接下來可能發生的事情，但主要的一點是人工智慧會隨著規模變得更好，這將導致世界各地人們生活的顯著改善。",
@@ -97,22 +99,27 @@
         "zh": "正如我們在其他技術中所看到的，也會有缺點，我們需要立即開始努力，以最大化人工智慧的好處，同時最小化其危害。舉例來說，我們預計這項技術可能在未來幾年對勞動力市場造成重大變化（好的和壞的），但大多數工作的變化速度會比大多數人想像的要慢，我不擔心我們會沒事可做（即使這些事情在今天看來不像「真正的工作」）。人們有創造和互相幫助的天性，人工智慧將讓我們以前所未有的方式放大自己的能力。作為一個社會，我們將重返一個擴張的世界，我們可以再次專注於進行正和博弈。",
         "en": "As we have seen with other technologies, there will also be downsides, and we need to start working now to maximize AI's benefits while minimizing its harms. As one example, we expect that this technology can cause a significant change in labor markets (good and bad) in the coming years, but most jobs will change more slowly than most people think, and I have no fear that we'll run out of things to do (even if they don't look like "real jobs" to us today). People have an innate desire to create and to be useful to each other, and AI will allow us to amplify our own abilities like never before. As a society, we will be back in an expanding world, and we can again focus on playing positive-sum games."
     }
+    
 ];
-        function createParagraphs() {
-            const content = document.getElementById('content');
-            paragraphs.forEach((para, index) => {
-                const div = document.createElement('div');
-                div.className = 'paragraph';
-                div.innerHTML = para.zh;
-                div.onclick = () => toggleLanguage(div, index);
-                content.appendChild(div);
-            });
-        }
-        function toggleLanguage(element, index) {
-            const para = paragraphs[index];
-            element.innerHTML = element.innerHTML === para.zh ? para.en : para.zh;
-        }
-        createParagraphs();
+
+    function createParagraphs() {
+        const content = document.getElementById('content');
+        paragraphs.forEach((para, index) => {
+            const div = document.createElement('div');
+            div.className = 'paragraph';
+            div.innerHTML = para.zh;
+            div.onclick = () => toggleLanguage(div, index);
+            content.appendChild(div);
+        });
+    }
+
+    function toggleLanguage(element, index) {
+        const para = paragraphs[index];
+        element.innerHTML = element.innerHTML === para.zh ? para.en : para.zh;
+    }
+
+    createParagraphs();
+});
     </script>
 </body>
 </html>
