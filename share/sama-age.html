@@ -1,31 +1,32 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智慧時代 / The Intelligence Age</title>
-    <style>
-        body {font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px;}
-        h1 {text-align: center; color: #2c3e50;}
-        .paragraph {margin-bottom: 20px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; cursor: pointer;}
-        .paragraph:hover {background-color: #f5f5f5;}
-        img {max-width: 100%; height: auto; display: block; margin: 20px auto;}
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智慧時代 / The Intelligence Age （中英對照）</title>
+<style>
+    body {font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; cursor: pointer;}
+    h1 {text-align: center; color: #2c3e50;}
+    .paragraph {margin-bottom: 20px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; cursor: pointer;}
+    .paragraph:hover {background-color: #f5f5f5;}
+    img {max-width: 100%; height: auto; display: block; margin: 20px auto;}
+</style>
 </head>
 <body>
-    <h1>智慧時代 / The Intelligence Age</h1>
+    <h1 id="header"></h1>
+    <p>Original post: <a href="https://ia.samaltman.com/" style="text-decoration: none;">https://ia.samaltman.com/</a></p>
+    <p><img src="https://ia.samaltman.com/_next/image?url=%2Fimages%2Fcover.png&w=256&q=100" alt="Cover image"></p>
     <div id="content"></div>
-    <script>
-document.addEventListener("DOMContentLoaded", function() {
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
     const paragraphs = [
-    
+    {
+        "zh": "智慧時代",  // Added the h1 content in Chinese
+        "en": "The Intelligence Age"  // h1 content in English
+    },
     {
         "zh": "２０２４年９月２３日",
         "en": "September 23, 2024"
-    },
-    {
-    "zh": "<a href=\"https://ia.samaltman.com/_next/image?url=%2Fimages%2Fcover.png&w=1200&q=100\" target=\"_blank\">點擊查看封面圖片</a>",
-    "en": "<a href=\"https://ia.samaltman.com/_next/image?url=%2Fimages%2Fcover.png&w=1200&q=100\" target=\"_blank\">Click to view cover image</a>"
     },
     {
         "zh": "一幅生動的印象派風景畫，描繪了一條蜿蜒的小徑延伸至地平線，兩旁是色彩繽紛的田野。",
@@ -97,18 +98,24 @@ document.addEventListener("DOMContentLoaded", function() {
     },
     {
         "zh": "正如我們在其他技術中所看到的，也會有缺點，我們需要立即開始努力，以最大化人工智慧的好處，同時最小化其危害。舉例來說，我們預計這項技術可能在未來幾年對勞動力市場造成重大變化（好的和壞的），但大多數工作的變化速度會比大多數人想像的要慢，我不擔心我們會沒事可做（即使這些事情在今天看來不像「真正的工作」）。人們有創造和互相幫助的天性，人工智慧將讓我們以前所未有的方式放大自己的能力。作為一個社會，我們將重返一個擴張的世界，我們可以再次專注於進行正和博弈。",
-        "en": "As we have seen with other technologies, there will also be downsides, and we need to start working now to maximize AI's benefits while minimizing its harms. As one example, we expect that this technology can cause a significant change in labor markets (good and bad) in the coming years, but most jobs will change more slowly than most people think, and I have no fear that we'll run out of things to do (even if they don't look like "real jobs" to us today). People have an innate desire to create and to be useful to each other, and AI will allow us to amplify our own abilities like never before. As a society, we will be back in an expanding world, and we can again focus on playing positive-sum games."
+        "en": "As we have seen with other technologies, there will also be downsides, and we need to start working now to maximize AI's benefits while minimizing its harms. As one example, we expect that this technology can cause a significant change in labor markets (good and bad) in the coming years, but most jobs will change more slowly than most people think, and I have no fear that we'll run out of things to do (even if they don't look like \"real jobs\" to us today). People have an innate desire to create and to be useful to each other, and AI will allow us to amplify our own abilities like never before. As a society, we will be back in an expanding world, and we can again focus on playing positive-sum games."
     }
-    
-];
+
+    ];
 
     function createParagraphs() {
+        // Handle the h1 content
+        const header = document.getElementById('header');
+        header.innerHTML = paragraphs[0].zh;  // Initialize with Chinese version
+        header.onclick = () => toggleLanguage(header, 0);  // Add click event to h1
+
+        // Handle the rest of the paragraphs
         const content = document.getElementById('content');
-        paragraphs.forEach((para, index) => {
+        paragraphs.slice(1).forEach((para, index) => {
             const div = document.createElement('div');
             div.className = 'paragraph';
             div.innerHTML = para.zh;
-            div.onclick = () => toggleLanguage(div, index);
+            div.onclick = () => toggleLanguage(div, index + 1);  // Adjust index for slicing
             content.appendChild(div);
         });
     }
@@ -119,7 +126,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     createParagraphs();
-});
-    </script>
+    });
+</script>
 </body>
 </html>
