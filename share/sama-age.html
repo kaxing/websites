@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧時代 / The Intelligence Age</title>
+    <style>
+        body {font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px;}
+        h1 {text-align: center; color: #2c3e50;}
+        .paragraph {margin-bottom: 20px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; cursor: pointer;}
+        .paragraph:hover {background-color: #f5f5f5;}
+        img {max-width: 100%; height: auto; display: block; margin: 20px auto;}
+    </style>
+</head>
+<body>
+    <h1>智慧時代 / The Intelligence Age</h1>
+    <div id="content"></div>
+    <script>
+        const paragraphs = [
+    {
+        "zh": "２０２４年９月２３日",
+        "en": "September 23, 2024"
+    },
+    {
+    "zh": "<a href=\"https://ia.samaltman.com/_next/image?url=%2Fimages%2Fcover.png&w=1200&q=100\" target=\"_blank\">點擊查看封面圖片</a>",
+    "en": "<a href=\"https://ia.samaltman.com/_next/image?url=%2Fimages%2Fcover.png&w=1200&q=100\" target=\"_blank\">Click to view cover image</a>"
+    },
+    {
+        "zh": "一幅生動的印象派風景畫，描繪了一條蜿蜒的小徑延伸至地平線，兩旁是色彩繽紛的田野。",
+        "en": "A vibrant, impressionistic landscape of a winding path that stretches towards the horizon, lined with colorful fields"
+    },
+    {
+        "zh": "在未來幾十年裡，我們將能夠做一些在我們祖父母看來如魔法般的事情。",
+        "en": "In the next couple of decades, we will be able to do things that would have seemed like magic to our grandparents."
+    },
+    {
+        "zh": "這種現象並不新鮮，但它將以嶄新的速度加速。人類的能力已經隨著時間大幅提升；我們現在已經能夠完成一些我們的前人認為不可能的事情。",
+        "en": "This phenomenon is not new, but it will be newly accelerated. People have become dramatically more capable over time; we can already accomplish things now that our predecessors would have believed to be impossible."
+    },
+    {
+        "zh": "我們變得更有能力並非因為基因的改變，而是因為我們受益於社會基礎設施遠比我們任何一個人都要聰明和強大；從某種重要意義上說，社會本身就是一種先進的智慧形式。我們的祖父母----以及他們之前的世代----建造並實現了偉大的事物。他們為我們所有人受益的人類進步鷹架做出了貢獻。人工智慧將為人們提供解決難題的工具，幫助我們為這個鷹架添加新的支撐，這些是我們靠自己無法想出來的。進步的故事將繼續，我們的子女將能夠做到我們無法做到的事情。",
+        "en": "We are more capable not because of genetic change, but because we benefit from the infrastructure of society being way smarter and more capable than any one of us; in an important sense, society itself is a form of advanced intelligence. Our grandparents – and the generations that came before them – built and achieved great things. They contributed to the scaffolding of human progress that we all benefit from. AI will give people tools to solve hard problems and help us add new struts to that scaffolding that we couldn't have figured out on our own. The story of progress will continue, and our children will be able to do things we can't."
+    },
+    {
+        "zh": "這不會一蹴而就，但我們很快就能與人工智慧合作，幫助我們完成比沒有人工智慧時多得多的事情；最終，我們每個人都可以擁有一個個人化的人工智慧團隊，由不同領域的虛擬專家組成，共同合作創造我們能想像到的幾乎任何事物。我們的孩子將擁有虛擬導師，可以用任何語言、以他們需要的任何節奏，為任何學科提供個性化的指導。我們可以想像類似的想法應用於更好的醫療保健、創造任何人能想像到的軟體的能力，以及更多方面。",
+        "en": "It won't happen all at once, but we'll soon be able to work with AI that helps us accomplish much more than we ever could without AI; eventually we can each have a personal AI team, full of virtual experts in different areas, working together to create almost anything we can imagine. Our children will have virtual tutors who can provide personalized instruction in any subject, in any language, and at whatever pace they need. We can imagine similar ideas for better healthcare, the ability to create any kind of software someone can imagine, and much more."
+    },
+    {
+        "zh": "有了這些新能力，我們可以實現今天看來難以想像的程度的共同繁榮；在未來，每個人的生活都可以比現在任何人的生活更好。單單繁榮並不一定能讓人快樂----有很多富人過得很痛苦----但它確實能顯著改善世界各地人們的生活。",
+        "en": "With these new abilities, we can have shared prosperity to a degree that seems unimaginable today; in the future, everyone's lives can be better than anyone's life is now. Prosperity alone doesn't necessarily make people happy – there are plenty of miserable rich people – but it would meaningfully improve the lives of people around the world."
+    },
+    {
+        "zh": "這裡有一個狹義的人類歷史視角：經過數千年的科學發現和技術進步的積累，我們已經弄清楚如何熔化沙子，添加一些雜質，在極其微小的尺度上以驚人的精確度排列它們製成電腦晶片，讓能量通過它，最終得到能夠創造越來越強大的人工智慧的系統。",
+        "en": "Here is one narrow way to look at human history: after thousands of years of compounding scientific discovery and technological progress, we have figured out how to melt sand, add some impurities, arrange it with astonishing precision at extraordinarily tiny scale into computer chips, run energy through it, and end up with systems capable of creating increasingly capable artificial intelligence."
+    },
+    {
+        "zh": "這可能會成為迄今為止所有歷史中最重要的事實。我們有可能在幾千天內（！）就擁有超級智慧；可能需要更長時間，但我相信我們終將實現。",
+        "en": "This may turn out to be the most consequential fact about all of history so far. It is possible that we will have superintelligence in a few thousand days (!); it may take longer, but I'm confident we'll get there."
+    },
+    {
+        "zh": "我們是如何來到繁榮的下一個飛躍的門檻的？\n\n用三個字來說：深度學習。\n\n用十五個字來說：深度學習奏效了，隨著規模可預測地變得更好，我們投入了越來越多的資源。",
+        "en": "How did we get to the doorstep of the next leap in prosperity?\n\nIn three words: deep learning worked.\n\nIn 15 words: deep learning worked, got predictably better with scale, and we dedicated increasing resources to it."
+    },
+    {
+        "zh": "就是這樣；人類發現了一種真正能學習任何數據分佈（或者說，產生任何數據分佈的底層「規則」）的演算法。令人震驚的是，可用的計算能力和數據越多，它在幫助人們解決難題方面就越好。我發現無論我花多少時間思考這個問題，我都無法真正內化它有多麼重要。",
+        "en": "That's really it; humanity discovered an algorithm that could really, truly learn any distribution of data (or really, the underlying "rules" that produce any distribution of data). To a shocking degree of precision, the more compute and data available, the better it gets at helping people solve hard problems. I find that no matter how much time I spend thinking about this, I can never really internalize how consequential it is."
+    },
+    {
+        "zh": "我們還有很多細節需要弄清楚，但被任何特定的挑戰分心是一個錯誤。深度學習是有效的，我們會解決剩下的問題。我們可以說很多關於接下來可能發生的事情，但主要的一點是人工智慧會隨著規模變得更好，這將導致世界各地人們生活的顯著改善。",
+        "en": "There are a lot of details we still have to figure out, but it's a mistake to get distracted by any particular challenge. Deep learning works, and we will solve the remaining problems. We can say a lot of things about what may happen next, but the main one is that AI is going to get better with scale, and that will lead to meaningful improvements to the lives of people around the world."
+    },
+    {
+        "zh": "人工智慧模型很快就會成為代表我們執行特定任務的自主個人助理，比如代表你協調醫療護理。在未來的某個時候，人工智慧系統會變得如此之好，以至於它們能幫助我們製造更好的下一代系統，並在各個領域推動科學進步。",
+        "en": "AI models will soon serve as autonomous personal assistants who carry out specific tasks on our behalf like coordinating medical care on your behalf. At some point further down the road, AI systems are going to get so good that they help us make better next-generation systems and make scientific progress across the board."
+    },
+    {
+        "zh": "技術將我們從石器時代帶到了農業時代，然後是工業時代。從這裡開始，通往智慧時代的道路由計算能力、能源和人類意志鋪就。",
+        "en": "Technology brought us from the Stone Age to the Agricultural Age and then to the Industrial Age. From here, the path to the Intelligence Age is paved with compute, energy, and human will."
+    },
+    {
+        "zh": "如果我們想將人工智慧交到盡可能多的人手中，我們需要降低計算成本並使其變得豐富（這需要大量的能源和晶片）。如果我們不建立足夠的基礎設施，人工智慧將成為一種非常有限的資源，會引發戰爭，並主要成為富人的工具。",
+        "en": "If we want to put AI into the hands of as many people as possible, we need to drive down the cost of compute and make it abundant (which requires lots of energy and chips). If we don't build enough infrastructure, AI will be a very limited resource that wars get fought over and that becomes mostly a tool for rich people."
+    },
+    {
+        "zh": "我們需要明智但堅定地行動。智慧時代的黎明是一個具有非常複雜且極高風險挑戰的重大發展。這不會是一個完全正面的故事，但其潛力如此巨大，以至於我們有義務為自己和未來找出如何應對擺在我們面前的風險。",
+        "en": "We need to act wisely but with conviction. The dawn of the Intelligence Age is a momentous development with very complex and extremely high-stakes challenges. It will not be an entirely positive story, but the upside is so tremendous that we owe it to ourselves, and the future, to figure out how to navigate the risks in front of us."
+    },
+    {
+        "zh": "我相信未來會如此光明，以至於現在沒有人能通過寫作來給它一個公正的評價；智慧時代的一個定義特徵將是大規模的繁榮。",
+        "en": "I believe the future is going to be so bright that no one can do it justice by trying to write about it now; a defining characteristic of the Intelligence Age will be massive prosperity."
+    },
+    {
+        "zh": "儘管這將是漸進的過程，但驚人的勝利----修復氣候、建立太空殖民地、發現所有物理學----最終將成為司空見慣的事。有了近乎無限的智慧和豐富的能源----產生偉大想法的能力，以及實現這些想法的能力----我們可以做很多事情。",
+        "en": "Although it will happen incrementally, astounding triumphs – fixing the climate, establishing a space colony, and the discovery of all of physics – will eventually become commonplace. With nearly-limitless intelligence and abundant energy – the ability to generate great ideas, and the ability to make them happen – we can do quite a lot."
+    },
+    {
+        "zh": "正如我們在其他技術中所看到的，也會有缺點，我們需要立即開始努力，以最大化人工智慧的好處，同時最小化其危害。舉例來說，我們預計這項技術可能在未來幾年對勞動力市場造成重大變化（好的和壞的），但大多數工作的變化速度會比大多數人想像的要慢，我不擔心我們會沒事可做（即使這些事情在今天看來不像「真正的工作」）。人們有創造和互相幫助的天性，人工智慧將讓我們以前所未有的方式放大自己的能力。作為一個社會，我們將重返一個擴張的世界，我們可以再次專注於進行正和博弈。",
+        "en": "As we have seen with other technologies, there will also be downsides, and we need to start working now to maximize AI's benefits while minimizing its harms. As one example, we expect that this technology can cause a significant change in labor markets (good and bad) in the coming years, but most jobs will change more slowly than most people think, and I have no fear that we'll run out of things to do (even if they don't look like "real jobs" to us today). People have an innate desire to create and to be useful to each other, and AI will allow us to amplify our own abilities like never before. As a society, we will be back in an expanding world, and we can again focus on playing positive-sum games."
+    }
+];
+        function createParagraphs() {
+            const content = document.getElementById('content');
+            paragraphs.forEach((para, index) => {
+                const div = document.createElement('div');
+                div.className = 'paragraph';
+                div.innerHTML = para.zh;
+                div.onclick = () => toggleLanguage(div, index);
+                content.appendChild(div);
+            });
+        }
+        function toggleLanguage(element, index) {
+            const para = paragraphs[index];
+            element.innerHTML = element.innerHTML === para.zh ? para.en : para.zh;
+        }
+        createParagraphs();
+    </script>
+</body>
+</html>
