@@ -11,8 +11,8 @@
     <style>
     body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: 'Open Sans', sans-serif; }
     .container { display: flex; width: 80%; height: 80%; position: relative; align-items: flex-start; padding-top: 10vh; }
-    .sidebar { width: 200px; padding: 10px; text-align: right; align-self: flex-start; }
-    .content { flex-grow: 1; padding-left: 20px; position: relative; overflow: auto; height: calc(100% - 10vh); max-width: calc(100% - 220px); }
+    .sidebar { width: 100px; padding: 10px; text-align: right; align-self: flex-start; }
+    .content { flex-grow: 1; padding-left: 20px; position: relative; overflow: auto; height: calc(100% - 10vh); max-width: calc(100% - 125px); }
     .sidebar a { display: block; margin: 5px 0; text-decoration: none; }
     .sidebar .section { margin-top: 20px; font-weight: 700; }
     iframe, .text-content { width: 100%; height: 100%; border: none; position: relative; z-index: 1; }
@@ -28,6 +28,7 @@
 <body>
     <div class="container">
         <div class="sidebar">
+            <p style="font-size: 0.1em;">(<kbd>Cmd</kbd>/<kbd>Ctrl</kbd> + <kbd>Click</kbd> to open in new tab)</p>
             <div class="section">LLM</div>
             <a href="./simprochat.html" data-type="html" title="A simple yet pro GPT-4o chat UI">SimProChat</a>
             <a href="./node-interface.html" data-type="html" title="Node-based LLM Interface">Node Interface</a>
