@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Share</title>
+    <script src="https://cdn.jsdelivr.net/npm/lzma@2.3.2/src/lzma_worker.js"></script>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+        textarea { width: 100%; min-height: 200px; margin: 1rem 0; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; }
+        button { padding: 0.5rem 1rem; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; }
+        .url-box { margin: 1rem 0; padding: 1rem; background: #f5f5f5; border-radius: 4px; display: none; word-break: break-all; }
+        .url-box a { color: #0066cc; }
+        .url-box button { margin-top: 0.5rem; background: #4CAF50; }
+        .stats, .progress { margin-top: 0.5rem; color: #666; font-size: 0.9rem; }
+        .progress { display: none; }
+    </style>
+</head>
+<body>
+    <h1>Text Share</h1>
+    <textarea id="textInput" placeholder="Enter any text (all UTF-8 characters supported)..."></textarea>
+    <div>
+        <button onclick="generateUrl()">Generate URL</button>
+    </div>
+    <div id="progress" class="progress">Processing: <span id="progressValue">0</span>%</div>
+    <div id="urlBox" class="url-box">
+        <div>Shareable URL:</div>
+        <a id="shareLink" href="#"></a>
+        <div><button onclick="copyUrl()">Copy URL</button></div>
+    </div>
+    <div id="stats" class="stats"></div>
+
+    <script>
+    const utils = {
+        // Convert bytes to MB with formatting
+        formatSize(bytes) {
+            const mb = (bytes / (1024 * 1024)).toFixed(2);
+            return `${bytes.toLocaleString()} bytes (${mb} MB)`;
+        },
+
+        // URL-safe Base64 encoding/decoding
+        toBase64URL(buf) {
+            const bytes = new Uint8Array(buf);
+            return btoa(Array.from(bytes).map(byte => String.fromCharCode(byte)).join(''))
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=/g, '');
+        },
+
+        fromBase64URL(str) {
+            const base64 = str.replace(/-/g, '+').replace(/_/g, '/').padEnd(str.length + (4 - str.length % 4) % 4, '=');
+            const binary = atob(base64);
+            return new Uint8Array(binary.split('').map(char => char.charCodeAt(0)));
+        }
+    };
+
+    const ui = {
+        updateProgress(percent) {
+            const displayPercent = Math.round(percent * 100);
+            const progressDiv = document.getElementById('progress');
+            progressDiv.style.display = 'block';
+            document.getElementById('progressValue').textContent = displayPercent;
+            if (displayPercent >= 100) {
+                setTimeout(() => progressDiv.style.display = 'none', 500);
+            }
+        },
+
+        updateStats(originalSize, compressedSize, hashLength) {
+            document.getElementById('stats').innerHTML = `
+                Original size: ${utils.formatSize(originalSize)}<br>
+                Compressed size: ${utils.formatSize(compressedSize)}<br>
+                URL hash length: ${utils.formatSize(hashLength)}<br>
+                Compression ratio: ${((1 - (compressedSize / originalSize)) * 100).toFixed(1)}% smaller
+            `;
+        }
+    };
+
+    // Main compression functions
+    async function compressText(text) {
+        return new Promise((resolve, reject) => {
+            document.getElementById('progress').style.display = 'none';
+            LZMA.compress(text, 9,
+                (result, error) => {
+                    if (error) reject(error);
+                    else resolve(utils.toBase64URL(result));
+                },
+                percent => ui.updateProgress(percent)
+            );
+        });
+    }
+
+    async function decompressText(encoded) {
+        return new Promise((resolve, reject) => {
+            document.getElementById('progress').style.display = 'none';
+            LZMA.decompress(utils.fromBase64URL(encoded),
+                (result, error) => {
+                    if (error) reject(error);
+                    else resolve(result);
+                },
+                percent => ui.updateProgress(percent)
+            );
+        });
+    }
+
+    // User actions
+    async function generateUrl() {
+        const text = document.getElementById('textInput').value;
+        if (!text) return;
+        
+        try {
+            const originalSize = new TextEncoder().encode(text).length;
+            const compressed = await compressText(text);
+            const compressedSize = Math.ceil(compressed.length * 3 / 4);
+            
+            const url = `${window.location.origin}${window.location.pathname}#${compressed}`;
+            const urlBox = document.getElementById('urlBox');
+            const shareLink = document.getElementById('shareLink');
+            
+            shareLink.href = url;
+            shareLink.textContent = url;
+            urlBox.style.display = 'block';
+            
+            ui.updateStats(originalSize, compressedSize, compressed.length);
+        } catch (error) {
+            console.error('Compression error:', error);
+            alert('Error generating URL. The text might be too large.');
+        }
+    }
+
+    async function copyUrl() {
+        const url = document.getElementById('shareLink').href;
+        try {
+            await navigator.clipboard.writeText(url);
+            const button = event.target;
+            button.textContent = 'Copied!';
+            setTimeout(() => button.textContent = 'Copy URL', 2000);
+        } catch (error) {
+            console.error('Copy failed:', error);
+            alert('Failed to copy URL to clipboard');
+        }
+    }
+
+    // Load shared text on page load
+    window.addEventListener('load', async () => {
+        const hash = window.location.hash.slice(1);
+        if (hash) {
+            try {
+                const text = await decompressText(hash);
+                document.getElementById('textInput').value = text;
+                generateUrl();
+            } catch (error) {
+                console.error('Decompression error:', error);
+                alert('Error loading shared text. The URL might be corrupted.');
+            }
+        }
+    });
+    </script>
+</body>
+</html>
