@@ -4,7 +4,207 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Text Share</title>
-    <script src="https://cdn.jsdelivr.net/npm/lzma@2.3.2/src/lzma_worker.js"></script>
+    <script type="module">
+        import { ZstdInit } from 'https://cdn.jsdelivr.net/npm/@oneidentity/zstd-js@1.0.3/+esm';
+
+        let ZstdSimple;
+        let zstdInitialized = false; // Readiness flag
+
+        // Initialize Zstd
+        ZstdInit().then((codec) => {
+            ZstdSimple = codec.ZstdSimple;
+            zstdInitialized = true;
+            console.log("Zstd initialized.");
+        }).catch((error) => {
+            console.error("Failed to initialize Zstd:", error);
+        });
+
+        const utils = {
+            base62Characters: "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
+
+            base62Encode(buffer) {
+                let num = BigInt("0x" + Array.from(buffer).map(b => b.toString(16).padStart(2, "0")).join(""));
+                let result = "";
+                const base = BigInt(62);
+
+                while (num > 0n) {
+                    const remainder = num % base;
+                    result = this.base62Characters[Number(remainder)] + result;
+                    num = num / base;
+                }
+
+                return result || "0";
+            },
+
+            base62Decode(str) {
+                let num = BigInt(0);
+                const base = BigInt(62);
+
+                for (const char of str) {
+                    num = num * base + BigInt(this.base62Characters.indexOf(char));
+                }
+
+                const hex = num.toString(16);
+                const padded = hex.padStart(Math.ceil(hex.length / 2) * 2, "0");
+                return Uint8Array.from(padded.match(/.{2}/g).map(byte => parseInt(byte, 16)));
+            },
+
+            fnv1aHash(text) {
+                let hash = 2166136261;
+                for (let i = 0; i < text.length; i++) {
+                    hash ^= text.charCodeAt(i);
+                    hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+                }
+                return hash >>> 0;
+            },
+
+            formatSize(bytes) {
+                const mb = (bytes / (1024 * 1024)).toFixed(2);
+                return `${bytes.toLocaleString()} bytes (${mb} MB)`;
+            }
+        };
+
+        async function waitForInitialization() {
+            if (zstdInitialized) return;
+            await new Promise((resolve) => {
+                const checkInterval = setInterval(() => {
+                    if (zstdInitialized) {
+                        clearInterval(checkInterval);
+                        resolve();
+                    }
+                }, 10);
+            });
+        }
+
+        async function compressText(text) {
+            await waitForInitialization();
+
+            const encoder = new TextEncoder();
+            const textBytes = encoder.encode(text);
+            console.log("Original text size:", textBytes.length, "bytes");
+
+            if (textBytes.length < 100) {
+                console.warn("Text too small for compression, hashing directly.");
+                return textBytes; // Skip compression for small text
+            }
+
+            try {
+                const compressionLevel = 22; // Maximum compression level for Zstd, slower but better compression
+                const compressed = ZstdSimple.compress(textBytes, compressionLevel);
+                console.log("Compressed size:", compressed.length, "bytes");
+                return compressed;
+            } catch (e) {
+                console.error("Compression error:", e);
+                throw new Error("Failed to compress text.");
+            }
+        }
+
+        async function decompressText(compressed) {
+            await waitForInitialization();
+
+            try {
+                const decompressed = ZstdSimple.decompress(compressed);
+                console.log("Decompressed size:", decompressed.length, "bytes");
+                const decoder = new TextDecoder();
+                return decoder.decode(new Uint8Array(decompressed));
+            } catch (e) {
+                console.error("Decompression error:", e);
+                throw new Error("Failed to decompress text.");
+            }
+        }
+
+        async function hashText(text) {
+            const hash = utils.fnv1aHash(text);
+            console.log("Hash generated:", hash);
+            return utils.base62Encode(new Uint8Array([hash >>> 24, (hash >>> 16) & 0xff, (hash >>> 8) & 0xff, hash & 0xff]));
+        }
+
+        async function compressAndHash(text) {
+            try {
+                const compressed = await compressText(text);
+                const base62Compressed = utils.base62Encode(compressed);
+                console.log("Base62 Encoded Compressed Text:", base62Compressed);
+                const hash = await hashText(base62Compressed);
+                return { hash, compressed: base62Compressed, compressedBytes: compressed.length };
+            } catch (e) {
+                throw new Error("Compression failed: " + e.message);
+            }
+        }
+
+        async function decompressAndValidate(hash, compressedBase62) {
+            try {
+                const calculatedHash = await hashText(compressedBase62);
+                if (calculatedHash !== hash) {
+                    console.error("Expected hash:", hash, "Calculated hash:", calculatedHash);
+                    throw new Error("Hash mismatch! The data might be corrupted.");
+                }
+                const compressed = utils.base62Decode(compressedBase62);
+                return await decompressText(compressed);
+            } catch (e) {
+                throw new Error("Decompression failed: " + e.message);
+            }
+        }
+
+        async function generateUrl() {
+            const text = document.getElementById("textInput").value;
+            if (!text) return;
+
+            try {
+                const originalSize = new TextEncoder().encode(text).length;
+                const { hash, compressed, compressedBytes } = await compressAndHash(text);
+                const url = `${window.location.origin}${window.location.pathname}#${hash}:${compressed}`;
+
+                const urlBox = document.getElementById("urlBox");
+                const shareLink = document.getElementById("shareLink");
+
+                shareLink.href = url;
+                shareLink.textContent = url;
+                urlBox.style.display = 'block';
+
+                const compressionRatio = ((1 - compressedBytes / originalSize) * 100).toFixed(1);
+
+                document.getElementById("stats").innerHTML = `
+                    Original size: ${utils.formatSize(originalSize)}<br>
+                    Compressed size: ${utils.formatSize(compressedBytes)}<br>
+                    Compression ratio: ${compressionRatio}% smaller<br>
+                    Generated URL hash length: ${hash.length + compressed.length} characters
+                `;
+            } catch (error) {
+                console.error("Error generating URL:", error);
+                alert("Error generating URL. The text might be too large.");
+            }
+        }
+
+        async function copyUrl() {
+            const url = document.getElementById("shareLink").href;
+            try {
+                await navigator.clipboard.writeText(url);
+                alert("URL copied to clipboard!");
+            } catch (error) {
+                console.error("Copy failed:", error);
+                alert("Failed to copy URL to clipboard.");
+            }
+        }
+
+        window.generateUrl = generateUrl;
+        window.copyUrl = copyUrl;
+
+        window.addEventListener("load", async () => {
+            const hashFragment = window.location.hash.slice(1);
+            if (hashFragment) {
+                const [hash, compressed] = hashFragment.split(":");
+                if (!hash || !compressed) return;
+
+                try {
+                    const text = await decompressAndValidate(hash, compressed);
+                    document.getElementById("textInput").value = text;
+                } catch (error) {
+                    console.error("Error loading shared text:", error);
+                    alert("Error loading shared text. The URL might be corrupted.");
+                }
+            }
+        });
+    </script>
     <style>
         body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
         textarea { width: 100%; min-height: 200px; margin: 1rem 0; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; }
@@ -29,131 +229,5 @@
         <div><button onclick="copyUrl()">Copy URL</button></div>
     </div>
     <div id="stats" class="stats"></div>
-
-    <script>
-    const utils = {
-        // Convert bytes to MB with formatting
-        formatSize(bytes) {
-            const mb = (bytes / (1024 * 1024)).toFixed(2);
-            return `${bytes.toLocaleString()} bytes (${mb} MB)`;
-        },
-
-        // URL-safe Base64 encoding/decoding
-        toBase64URL(buf) {
-            const bytes = new Uint8Array(buf);
-            return btoa(Array.from(bytes).map(byte => String.fromCharCode(byte)).join(''))
-                .replace(/\+/g, '-')
-                .replace(/\//g, '_')
-                .replace(/=/g, '');
-        },
-
-        fromBase64URL(str) {
-            const base64 = str.replace(/-/g, '+').replace(/_/g, '/').padEnd(str.length + (4 - str.length % 4) % 4, '=');
-            const binary = atob(base64);
-            return new Uint8Array(binary.split('').map(char => char.charCodeAt(0)));
-        }
-    };
-
-    const ui = {
-        updateProgress(percent) {
-            const displayPercent = Math.round(percent * 100);
-            const progressDiv = document.getElementById('progress');
-            progressDiv.style.display = 'block';
-            document.getElementById('progressValue').textContent = displayPercent;
-            if (displayPercent >= 100) {
-                setTimeout(() => progressDiv.style.display = 'none', 500);
-            }
-        },
-
-        updateStats(originalSize, compressedSize, hashLength) {
-            document.getElementById('stats').innerHTML = `
-                Original size: ${utils.formatSize(originalSize)}<br>
-                Compressed size: ${utils.formatSize(compressedSize)}<br>
-                URL hash length: ${utils.formatSize(hashLength)}<br>
-                Compression ratio: ${((1 - (compressedSize / originalSize)) * 100).toFixed(1)}% smaller
-            `;
-        }
-    };
-
-    // Main compression functions
-    async function compressText(text) {
-        return new Promise((resolve, reject) => {
-            document.getElementById('progress').style.display = 'none';
-            LZMA.compress(text, 9,
-                (result, error) => {
-                    if (error) reject(error);
-                    else resolve(utils.toBase64URL(result));
-                },
-                percent => ui.updateProgress(percent)
-            );
-        });
-    }
-
-    async function decompressText(encoded) {
-        return new Promise((resolve, reject) => {
-            document.getElementById('progress').style.display = 'none';
-            LZMA.decompress(utils.fromBase64URL(encoded),
-                (result, error) => {
-                    if (error) reject(error);
-                    else resolve(result);
-                },
-                percent => ui.updateProgress(percent)
-            );
-        });
-    }
-
-    // User actions
-    async function generateUrl() {
-        const text = document.getElementById('textInput').value;
-        if (!text) return;
-        
-        try {
-            const originalSize = new TextEncoder().encode(text).length;
-            const compressed = await compressText(text);
-            const compressedSize = Math.ceil(compressed.length * 3 / 4);
-            
-            const url = `${window.location.origin}${window.location.pathname}#${compressed}`;
-            const urlBox = document.getElementById('urlBox');
-            const shareLink = document.getElementById('shareLink');
-            
-            shareLink.href = url;
-            shareLink.textContent = url;
-            urlBox.style.display = 'block';
-            
-            ui.updateStats(originalSize, compressedSize, compressed.length);
-        } catch (error) {
-            console.error('Compression error:', error);
-            alert('Error generating URL. The text might be too large.');
-        }
-    }
-
-    async function copyUrl() {
-        const url = document.getElementById('shareLink').href;
-        try {
-            await navigator.clipboard.writeText(url);
-            const button = event.target;
-            button.textContent = 'Copied!';
-            setTimeout(() => button.textContent = 'Copy URL', 2000);
-        } catch (error) {
-            console.error('Copy failed:', error);
-            alert('Failed to copy URL to clipboard');
-        }
-    }
-
-    // Load shared text on page load
-    window.addEventListener('load', async () => {
-        const hash = window.location.hash.slice(1);
-        if (hash) {
-            try {
-                const text = await decompressText(hash);
-                document.getElementById('textInput').value = text;
-                generateUrl();
-            } catch (error) {
-                console.error('Decompression error:', error);
-                alert('Error loading shared text. The URL might be corrupted.');
-            }
-        }
-    });
-    </script>
 </body>
 </html>
