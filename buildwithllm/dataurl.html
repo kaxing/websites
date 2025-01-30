@@ -78,35 +78,27 @@
 
         async function compressText(text) {
             await waitForInitialization();
-
             const encoder = new TextEncoder();
             const textBytes = encoder.encode(text);
-            console.log("Original text size:", textBytes.length, "bytes");
-
-            if (textBytes.length < 100) {
-                console.warn("Text too small for compression, hashing directly.");
-                return textBytes; // Skip compression for small text
+            
+            if (textBytes.length <= 100) {
+                return textBytes;  // Just return uncompressed
             }
 
-            try {
-                const compressionLevel = 22; // Maximum compression level for Zstd, slower but better compression
-                const compressed = ZstdSimple.compress(textBytes, compressionLevel);
-                console.log("Compressed size:", compressed.length, "bytes");
-                return compressed;
-            } catch (e) {
-                console.error("Compression error:", e);
-                throw new Error("Failed to compress text.");
-            }
+            return ZstdSimple.compress(textBytes, 22);
         }
 
-        async function decompressText(compressed) {
+        async function decompressText(data) {
             await waitForInitialization();
-
+            
             try {
-                const decompressed = ZstdSimple.decompress(compressed);
-                console.log("Decompressed size:", decompressed.length, "bytes");
-                const decoder = new TextDecoder();
-                return decoder.decode(new Uint8Array(decompressed));
+                try {
+                    const decompressed = ZstdSimple.decompress(data);
+                    return new TextDecoder().decode(decompressed);
+                } catch {
+                    // If decompression fails, treat as raw bytes
+                    return new TextDecoder().decode(data);
+                }
             } catch (e) {
                 console.error("Decompression error:", e);
                 throw new Error("Failed to decompress text.");
@@ -207,7 +199,7 @@
     </script>
     <style>
         body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
-        textarea { width: 100%; min-height: 200px; margin: 1rem 0; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; }
+        textarea { font-family: "Courier New", Courier, monospace; white-space: pre; width: 100%; min-height: 200px; margin: 1rem 0; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
         button { padding: 0.5rem 1rem; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; }
         .url-box { margin: 1rem 0; padding: 1rem; background: #f5f5f5; border-radius: 4px; display: none; word-break: break-all; }
         .url-box a { color: #0066cc; }
