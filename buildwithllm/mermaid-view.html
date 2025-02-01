@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mermaid View</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.3.0/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 10px;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #input-area {
+            height: 10vh;
+            width: 100%;
+            resize: none;
+            margin-bottom: 10px;
+            font-family: monospace;
+            border: 1px solid #ccc;
+            border-bottom: 5px solid #ccc;
+            box-sizing: border-box;
+            transition: all 0.3s ease;
+        }
+        #input-area:hover {
+            border-color: #999;
+        }
+        #mermaid {
+            flex-grow: 1;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            position: relative;
+        }
+        #mermaid svg {
+            max-width: 100%;
+            height: auto;
+        }
+        button {
+            padding: 5px 10px;
+            font-size: 14px;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1;
+        }
+        #error-message {
+            color: red;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <textarea id="input-area">mindmap
+  root((Mind Map))
+    Branch1
+      Sub-branch1
+      Sub-branch2
+    Branch2
+      Sub-branch3
+      Sub-branch4</textarea>
+    <div id="error-message"></div>
+    <div id="mermaid">
+        <button id="render-button">Rerender</button>
+    </div>
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: false, 
+            theme: 'default',
+            mindmap: {
+                padding: 10,
+                nodeSpacing: 60,
+                rankSpacing: 80,
+            }
+        });
+
+        const inputArea = document.getElementById('input-area');
+        const mermaidDiv = document.getElementById('mermaid');
+        const errorMessage = document.getElementById('error-message');
+        const renderButton = document.getElementById('render-button');
+
+        let debounceTimer;
+        let svgElement;
+        let isPanning = false, startX, startY, initialX = 0, initialY = 0, scale = 1;
+
+        async function renderChart() {
+            mermaidDiv.innerHTML = '';
+            errorMessage.textContent = '';
+
+            try {
+                const { svg } = await mermaid.render('generatedDiagram', inputArea.value);
+                mermaidDiv.innerHTML = svg;
+                mermaidDiv.appendChild(renderButton);
+
+                svgElement = mermaidDiv.querySelector("svg");
+                if (svgElement) {
+                    setupSvgInteractions();
+                    if (inputArea.value.trim().startsWith('mindmap')) {
+                        removeNodeBorders();
+                    }
+                }
+            } catch (error) {
+                console.error("Error rendering chart:", error);
+                showError("Error rendering chart. Please check your syntax.");
+            }
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+        }
+
+        function setupSvgInteractions() {
+            svgElement.addEventListener('mousedown', startPanning);
+            svgElement.addEventListener('mousemove', pan);
+            svgElement.addEventListener('mouseup', stopPanning);
+            svgElement.addEventListener('mouseleave', stopPanning);
+            svgElement.addEventListener('wheel', zoom);
+        }
+
+        function removeNodeBorders() {
+            const nodeBkgs = svgElement.querySelectorAll('.node-bkg');
+            nodeBkgs.forEach(node => {
+                node.setAttribute('stroke', 'none');
+                node.setAttribute('stroke-width', '0');
+            });
+        }
+
+        function startPanning(e) {
+            e.preventDefault();
+            isPanning = true;
+            startX = e.clientX;
+            startY = e.clientY;
+        }
+
+        function pan(e) {
+            if (isPanning) {
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                svgElement.style.transform = `translate(${initialX + dx}px, ${initialY + dy}px) scale(${scale})`;
+            }
+        }
+
+        function stopPanning() {
+            if (isPanning) {
+                isPanning = false;
+                const transform = svgElement.style.transform;
+                const match = transform.match(/translate\(([-\d.]+)px,\s*([-\d.]+)px\)/);
+                initialX = match ? parseFloat(match[1]) : 0;
+                initialY = match ? parseFloat(match[2]) : 0;
+            }
+        }
+
+        function zoom(e) {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.1 : 0.1;
+            scale = Math.min(Math.max(0.5, scale + delta), 5);
+            svgElement.style.transform = `translate(${initialX}px, ${initialY}px) scale(${scale})`;
+        }
+
+        function toggleInputArea() {
+            inputArea.style.height = inputArea.style.height === '90vh' ? '10vh' : '90vh';
+            inputArea.style.marginBottom = inputArea.style.height === '90vh' ? '0' : '10px';
+        }
+
+        inputArea.addEventListener('click', function(e) {
+            const rect = inputArea.getBoundingClientRect();
+            if (e.clientY > rect.bottom - 15) {
+                toggleInputArea();
+            }
+        });
+
+        inputArea.addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(renderChart, 300);
+        });
+
+        renderButton.addEventListener('click', renderChart);
+
+        document.addEventListener('DOMContentLoaded', renderChart);
+    </script>
+</body>
+</html>

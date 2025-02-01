@@ -64,7 +64,7 @@ pre.codeblock code {font-family: 'Courier New', Courier, monospace; font-size: 1
 </style>
 </head>
 <body>
-<div id="apiKeySection" onclick="this.classList.toggle('hidden');"><input type="password" id="apiKeyInput" placeholder="Enter your API key" oninput="saveApiKey()"></div>
+<div id="apiKeySection" onclick="this.classList.toggle('hidden');"><input type="password" id="apiKeyInput" placeholder="This is a BYO-OpenAI-API-key interface, pointing to the `chatgpt-4o-latest` model; nothing is stored on the web page's hosting server." oninput="saveApiKey()" onclick="event.stopPropagation();"></div>
 <div id="mainContent">
 <div id="mainColumn">
 <div id="chatHistoryNavigation">

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Share</title>
+    <script type="module">
+        import { ZstdInit } from 'https://cdn.jsdelivr.net/npm/@oneidentity/zstd-js@1.0.3/+esm';
+
+        let ZstdSimple;
+        let zstdInitialized = false; // Readiness flag
+
+        // Initialize Zstd
+        ZstdInit().then((codec) => {
+            ZstdSimple = codec.ZstdSimple;
+            zstdInitialized = true;
+            console.log("Zstd initialized.");
+        }).catch((error) => {
+            console.error("Failed to initialize Zstd:", error);
+        });
+
+        const utils = {
+            base62Characters: "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
+
+            base62Encode(buffer) {
+                let num = BigInt("0x" + Array.from(buffer).map(b => b.toString(16).padStart(2, "0")).join(""));
+                let result = "";
+                const base = BigInt(62);
+
+                while (num > 0n) {
+                    const remainder = num % base;
+                    result = this.base62Characters[Number(remainder)] + result;
+                    num = num / base;
+                }
+
+                return result || "0";
+            },
+
+            base62Decode(str) {
+                let num = BigInt(0);
+                const base = BigInt(62);
+
+                for (const char of str) {
+                    num = num * base + BigInt(this.base62Characters.indexOf(char));
+                }
+
+                const hex = num.toString(16);
+                const padded = hex.padStart(Math.ceil(hex.length / 2) * 2, "0");
+                return Uint8Array.from(padded.match(/.{2}/g).map(byte => parseInt(byte, 16)));
+            },
+
+            fnv1aHash(text) {
+                let hash = 2166136261;
+                for (let i = 0; i < text.length; i++) {
+                    hash ^= text.charCodeAt(i);
+                    hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+                }
+                return hash >>> 0;
+            },
+
+            formatSize(bytes) {
+                const mb = (bytes / (1024 * 1024)).toFixed(2);
+                return `${bytes.toLocaleString()} bytes (${mb} MB)`;
+            }
+        };
+
+        async function waitForInitialization() {
+            if (zstdInitialized) return;
+            await new Promise((resolve) => {
+                const checkInterval = setInterval(() => {
+                    if (zstdInitialized) {
+                        clearInterval(checkInterval);
+                        resolve();
+                    }
+                }, 10);
+            });
+        }
+
+        async function compressText(text) {
+            await waitForInitialization();
+            const encoder = new TextEncoder();
+            const textBytes = encoder.encode(text);
+            
+            if (textBytes.length <= 100) {
+                return textBytes;  // Just return uncompressed
+            }
+
+            return ZstdSimple.compress(textBytes, 22);
+        }
+
+        async function decompressText(data) {
+            await waitForInitialization();
+            
+            try {
+                try {
+                    const decompressed = ZstdSimple.decompress(data);
+                    return new TextDecoder().decode(decompressed);
+                } catch {
+                    // If decompression fails, treat as raw bytes
+                    return new TextDecoder().decode(data);
+                }
+            } catch (e) {
+                console.error("Decompression error:", e);
+                throw new Error("Failed to decompress text.");
+            }
+        }
+
+        async function hashText(text) {
+            const hash = utils.fnv1aHash(text);
+            console.log("Hash generated:", hash);
+            return utils.base62Encode(new Uint8Array([hash >>> 24, (hash >>> 16) & 0xff, (hash >>> 8) & 0xff, hash & 0xff]));
+        }
+
+        async function compressAndHash(text) {
+            try {
+                const compressed = await compressText(text);
+                const base62Compressed = utils.base62Encode(compressed);
+                console.log("Base62 Encoded Compressed Text:", base62Compressed);
+                const hash = await hashText(base62Compressed);
+                return { hash, compressed: base62Compressed, compressedBytes: compressed.length };
+            } catch (e) {
+                throw new Error("Compression failed: " + e.message);
+            }
+        }
+
+        async function decompressAndValidate(hash, compressedBase62) {
+            try {
+                const calculatedHash = await hashText(compressedBase62);
+                if (calculatedHash !== hash) {
+                    console.error("Expected hash:", hash, "Calculated hash:", calculatedHash);
+                    throw new Error("Hash mismatch! The data might be corrupted.");
+                }
+                const compressed = utils.base62Decode(compressedBase62);
+                return await decompressText(compressed);
+            } catch (e) {
+                throw new Error("Decompression failed: " + e.message);
+            }
+        }
+
+        async function generateUrl() {
+            const text = document.getElementById("textInput").value;
+            if (!text) return;
+
+            try {
+                const originalSize = new TextEncoder().encode(text).length;
+                const { hash, compressed, compressedBytes } = await compressAndHash(text);
+                const url = `${window.location.origin}${window.location.pathname}#${hash}:${compressed}`;
+
+                const urlBox = document.getElementById("urlBox");
+                const shareLink = document.getElementById("shareLink");
+
+                shareLink.href = url;
+                shareLink.textContent = url;
+                urlBox.style.display = 'block';
+
+                const compressionRatio = ((1 - compressedBytes / originalSize) * 100).toFixed(1);
+
+                document.getElementById("stats").innerHTML = `
+                    Original size: ${utils.formatSize(originalSize)}<br>
+                    Compressed size: ${utils.formatSize(compressedBytes)}<br>
+                    Compression ratio: ${compressionRatio}% smaller<br>
+                    Generated URL hash length: ${hash.length + compressed.length} characters
+                `;
+            } catch (error) {
+                console.error("Error generating URL:", error);
+                alert("Error generating URL. The text might be too large.");
+            }
+        }
+
+        async function copyUrl() {
+            const url = document.getElementById("shareLink").href;
+            try {
+                await navigator.clipboard.writeText(url);
+                alert("URL copied to clipboard!");
+            } catch (error) {
+                console.error("Copy failed:", error);
+                alert("Failed to copy URL to clipboard.");
+            }
+        }
+
+        window.generateUrl = generateUrl;
+        window.copyUrl = copyUrl;
+
+        window.addEventListener("load", async () => {
+            const hashFragment = window.location.hash.slice(1);
+            if (hashFragment) {
+                const [hash, compressed] = hashFragment.split(":");
+                if (!hash || !compressed) return;
+
+                try {
+                    const text = await decompressAndValidate(hash, compressed);
+                    document.getElementById("textInput").value = text;
+                } catch (error) {
+                    console.error("Error loading shared text:", error);
+                    alert("Error loading shared text. The URL might be corrupted.");
+                }
+            }
+        });
+    </script>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+        textarea { font-family: "Courier New", Courier, monospace; white-space: pre; width: 100%; min-height: 200px; margin: 1rem 0; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 0.5rem 1rem; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; }
+        .url-box { margin: 1rem 0; padding: 1rem; background: #f5f5f5; border-radius: 4px; display: none; word-break: break-all; }
+        .url-box a { color: #0066cc; }
+        .url-box button { margin-top: 0.5rem; background: #4CAF50; }
+        .stats, .progress { margin-top: 0.5rem; color: #666; font-size: 0.9rem; }
+        .progress { display: none; }
+    </style>
+</head>
+<body>
+    <h1>Text Share</h1>
+    <textarea id="textInput" placeholder="Enter any text (all UTF-8 characters supported)..."></textarea>
+    <div>
+        <button onclick="generateUrl()">Generate URL</button>
+    </div>
+    <div id="progress" class="progress">Processing: <span id="progressValue">0</span>%</div>
+    <div id="urlBox" class="url-box">
+        <div>Shareable URL:</div>
+        <a id="shareLink" href="#"></a>
+        <div><button onclick="copyUrl()">Copy URL</button></div>
+    </div>
+    <div id="stats" class="stats"></div>
+</body>
+</html>
