@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- Optimized for mobile, including iPhone Safari -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HTML Viewer</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 10px;
+      margin: 0;
+    }
+    input, button, textarea {
+      width: 100%;
+      box-sizing: border-box;
+      margin-top: 10px;
+      font-size: 16px;
+    }
+    textarea {
+      height: 150px;
+      font-family: monospace;
+      resize: vertical;
+    }
+  </style>
+</head>
+<body>
+  <input type="file" id="fileInput" accept=".html">
+  <textarea id="sourceArea" placeholder="HTML source will appear here..."></textarea>
+  <button id="viewButton">View Webpage</button>
+
+  <script>
+    // Opens the provided HTML content in a new tab using a Blob URL.
+    function openHTML(content) {
+      const blob = new Blob([content], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    }
+
+    // Load the selected file into the textarea.
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('sourceArea').value = e.target.result;
+      };
+      reader.readAsText(file);
+    });
+
+    // When the button is clicked, open the HTML content in a new tab.
+    document.getElementById('viewButton').addEventListener('click', function() {
+      const content = document.getElementById('sourceArea').value;
+      if (content.trim()) {
+        openHTML(content);
+      } else {
+        alert('No HTML content found.');
+      }
+    });
+  </script>
+</body>
+</html>
