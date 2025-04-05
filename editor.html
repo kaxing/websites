@@ -8,18 +8,18 @@
     <style>
         :root {
             /* Core brand colors from minimal.codes */
-            --signature-color: #FFB300; /* Brighter yellow-orange for accent */
+            --signature-color: #FFB300;
             --pantone-black: #1C1C1C;
             --pantone-charcoal: #2E2E2E;
-            --pantone-grey-dark: #4A4A4A;
             --pantone-grey-medium: #7F7F7F;
-            --pantone-grey-light: #BFBFBF;
-            --pantone-grey-very-light: #EAEAEA;
-            --pantone-white: #FAFAFA;
+            --pantone-grey-light: #DADADA;
+            --editor-bg: #FFFFFF;
+            --tab-hover: #F5F5F5;
+            --outtee: #F3F1EC;
             
             /* Application variables mapped to brand colors */
-            --background: var(--pantone-white);
-            --surface: var(--pantone-grey-very-light);
+            --background: var(--editor-bg);
+            --surface: var(--tab-hover);
             --primary: var(--signature-color);
             --text: var(--pantone-charcoal);
             --text-light: var(--pantone-grey-medium);
@@ -141,7 +141,7 @@
             height: 38px;
         }
         .tab:hover {
-            background-color: rgba(255, 179, 0, 0.03); /* Signature color with low opacity */
+            background-color: var(--tab-hover);
         }
         .tab.active {
             color: var(--pantone-black);
@@ -166,8 +166,8 @@
 
         /* Visual indicator for tab titles that can be edited */
         .tab-title[data-rename-handler-setup="true"]:hover {
-            background-color: rgba(58, 134, 255, 0.08);
-            outline: 1px dotted rgba(58, 134, 255, 0.3);
+            background-color: rgba(255, 179, 0, 0.05);
+            outline: 1px dotted rgba(255, 179, 0, 0.3);
         }
         /* Remove visual indicator */
         .tab-delete {
@@ -189,7 +189,7 @@
         }
         .tab-delete:hover {
             opacity: 1 !important;
-            background-color: rgba(255, 179, 0, 0.15);
+            background-color: rgba(255, 179, 0, 0.1);
             color: var(--pantone-black);
         }
         .tab-edit-input {
@@ -243,7 +243,7 @@
         }
         .new-tab-btn:hover {
             color: var(--primary);
-            background-color: rgba(58, 134, 255, 0.03);
+            background-color: var(--tab-hover);
         }
         .editor-container { flex: 1; padding: 20px; overflow: hidden; position: relative; }
         #editor { width: 100%; height: 100%; border: none; resize: none; font-size: 16px; line-height: 1.6; color: var(--text); background: transparent; outline: none; padding: 0; }
@@ -325,7 +325,7 @@
         .sidebar-toggle:hover {
             color: var(--primary);
             border-color: var(--border);
-            background-color: rgba(58, 134, 255, 0.03);
+            background-color: var(--tab-hover);
         }
 
         /* Collapsed state */
@@ -353,7 +353,7 @@
             padding: 12px 20px;
         }
         .btn { background: transparent; border: 1px solid var(--border); color: var(--text-light); font-size: 13px; padding: 6px 10px; border-radius: var(--radius); cursor: pointer; transition: var(--transition); }
-        .btn:hover { border-color: var(--primary); color: var(--pantone-black); background-color: rgba(255, 179, 0, 0.1); }
+        .btn:hover { border-color: var(--primary); color: var(--pantone-black); background-color: var(--tab-hover); }
         .btn-primary { background: var(--primary); color: var(--pantone-black); border-color: var(--primary); }
         .btn-primary:hover { color: var(--pantone-black); opacity: 0.9; }
         .auto-save-toggle { display: flex; align-items: center; margin-left: auto; font-size: 13px; color: var(--text-light); }
@@ -380,7 +380,7 @@
         }
         .toggle-sidebar-btn:hover {
             color: var(--primary);
-            background-color: rgba(58, 134, 255, 0.03);
+            background-color: var(--tab-hover);
         }
         .diff-highlight { background: #f0fff4; color: #16a34a; }
         .status { position: absolute; bottom: 10px; right: 20px; font-size: 13px; color: var(--text-light); opacity: 0; transition: var(--transition); background: var(--surface); padding: 4px 10px; border-radius: 20px; pointer-events: none; }
@@ -411,7 +411,7 @@
                 --max-width: var(--optimal-width);
             }
             body {
-                background: #f5f7f9;
+                background: var(--outtee);
             }
             .app {
                 margin-top: 20px;
@@ -1519,9 +1519,15 @@
                         }).join('');
                     } else {
                         // Only show "No revisions yet" if sidebar is not collapsed
-                        if (!this.dom.sidebar.classList.contains('collapsed')) {
+                        const sidebarCollapsed = this.dom.sidebar.classList.contains('collapsed');
+                        if (this.state.debug) {
+                            console.log(`[loadRevHistory] Sidebar collapsed state: ${sidebarCollapsed}`);
+                        }
+                        
+                        if (!sidebarCollapsed) {
                             this.dom.historyList.innerHTML = '<li class="history-item">No revisions yet</li>';
                         } else {
+                            // Clear the history list when collapsed to prevent showing "No revisions yet"
                             this.dom.historyList.innerHTML = '';
                         }
                     }
@@ -1891,6 +1897,10 @@
                 } catch (err) {
                     console.error('Save sidebar state error:', err);
                 }
+                
+                // Refresh the revision history list to ensure "No revisions yet" message is properly updated
+                // This will clear the message when collapsed and show it when expanded
+                await this.loadRevHistory();
 
                 // Slight delay before triggering window resize event to properly adjust layout
                 setTimeout(() => {
@@ -1975,6 +1985,10 @@
                     }
 
                     // Removed history view state loading - using only sidebar toggle now
+                    
+                    // Refresh the revision history to ensure proper display based on sidebar state
+                    // This will ensure "No revisions yet" message is properly hidden when sidebar is collapsed
+                    await this.loadRevHistory();
                 } catch (err) {
                     console.error('Load sidebar/history state error:', err);
                 }
