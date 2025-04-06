@@ -16,7 +16,7 @@
             --editor-bg: #FFFFFF;
             --tab-hover: #F5F5F5;
             --outtee: #F3F1EC;
-            
+
             /* Application variables mapped to brand colors */
             --background: var(--editor-bg);
             --surface: var(--tab-hover);
@@ -77,6 +77,12 @@
             width: 100%; /* Ensure tab bar respects parent width */
             min-width: 0; /* Important for flex containers */
             overflow: visible; /* Allow content to be visible when scrolled */
+            touch-action: pan-x; /* Only allow horizontal touch actions */
+            -webkit-user-select: none; /* Prevent text selection on iOS */
+            user-select: none; /* Prevent text selection */
+            -webkit-user-drag: none; /* Prevent browser drag behavior */
+            user-drag: none; /* Prevent browser drag behavior */
+            -webkit-touch-callout: none; /* Disable touch callout */
         }
         .tabs-container {
             display: flex;
@@ -84,6 +90,9 @@
             overflow: hidden;
             position: relative;
             min-width: 0; /* Prevent container from expanding beyond parent width */
+            touch-action: pan-x; /* Only allow horizontal touch actions */
+            -webkit-user-select: none; /* Prevent text selection on iOS */
+            user-select: none; /* Prevent text selection */
         }
         .tabs {
             display: flex;
@@ -95,6 +104,12 @@
             flex-wrap: nowrap; /* Prevent tabs from wrapping to next line */
             padding-bottom: 1px; /* Avoid border overlap with bottom border */
             max-width: 100%; /* Ensure tabs don't exceed container width */
+            -webkit-overflow-scrolling: touch; /* Smooth iOS scrolling */
+            touch-action: pan-x; /* Only allow horizontal touch scrolling */
+            overflow-y: hidden; /* Explicitly prevent vertical scrolling */
+            -webkit-user-drag: none; /* Prevent browser drag behavior */
+            user-drag: none; /* Prevent browser drag behavior */
+            -webkit-touch-callout: none; /* Disable touch callout */
         }
         .tabs::-webkit-scrollbar {
             display: none;
@@ -139,6 +154,31 @@
             flex-shrink: 0; /* Prevent tabs from shrinking */
             transition: background-color 0.15s ease;
             height: 38px;
+            touch-action: pan-x; /* Only allow horizontal touch actions */
+            -webkit-tap-highlight-color: transparent; /* Remove tap highlight on iOS */
+            pointer-events: auto; /* Ensure click events still work */
+        }
+        
+        /* Special cursor for drag handle area */
+        .tab::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 10px; /* Small drag area */
+            height: 100%;
+            cursor: grab; /* Show grab cursor */
+        }
+        
+        /* Change cursor when dragging */
+        .tab.dragging::before {
+            cursor: grabbing;
+        }
+        
+        /* Visual feedback for drop target */
+        .tab-drop-target {
+            box-shadow: inset 0 0 0 2px var(--primary);
+            z-index: 1;
         }
         .tab:hover {
             background-color: var(--tab-hover);
@@ -149,6 +189,10 @@
             border-bottom: 2px solid var(--primary);
             font-weight: 500;
         }
+        .tab.focused {
+            outline: 2px solid rgba(255, 179, 0, 0.3);
+            outline-offset: -2px;
+        }
         .tab-title {
             overflow: hidden;
             text-overflow: ellipsis;
@@ -157,8 +201,9 @@
             min-width: 0;
             line-height: 1.2;
             user-select: text; /* Allow text selection for better double-click handling */
-            cursor: text; /* Indicate text can be edited */
-            z-index: 999;
+            -webkit-user-select: text; /* Allow text selection on iOS for editing */
+            cursor: pointer; /* Use pointer cursor by default */
+            /* z-index: 999; */
             transition: background-color 0.2s ease;
             padding: 2px 4px;
             margin: -2px -4px;
@@ -168,6 +213,12 @@
         .tab-title[data-rename-handler-setup="true"]:hover {
             background-color: rgba(255, 179, 0, 0.05);
             outline: 1px dotted rgba(255, 179, 0, 0.3);
+        }
+        /* Special indicator for active tabs to show they can be renamed */
+        .tab.active .tab-title:hover {
+            background-color: rgba(255, 179, 0, 0.1);
+            outline: 1px dotted rgba(255, 179, 0, 0.5);
+            cursor: text; /* Only show text cursor when tab is active and hovering */
         }
         /* Remove visual indicator */
         .tab-delete {
@@ -200,23 +251,24 @@
             width: 100%;
             height: 100%;
             padding: 8px 14px;
-            
+            z-index: 10; /* Ensure it's above everything else */
+
             /* Text and appearance */
             font-size: 13px;
             font-family: inherit;
             border: none;
-            background: var(--pantone-white);
+            background: white; /* Use solid white background */
             outline: 2px solid var(--primary);
             box-sizing: border-box;
             color: var(--pantone-black);
-            
+
             /* Layer and visibility */
-            z-index: 9999;
-            
+            /* z-index: 9999; */
+
             /* Simpler and more reliable */
             margin: 0;
             display: block;
-            
+
             /* Minimal.codes style touches */
             border-radius: 2px;
             transition: background-color 0.2s ease;
@@ -245,8 +297,8 @@
             color: var(--primary);
             background-color: var(--tab-hover);
         }
-        .editor-container { flex: 1; padding: 20px; overflow: hidden; position: relative; }
-        #editor { width: 100%; height: 100%; border: none; resize: none; font-size: 16px; line-height: 1.6; color: var(--text); background: transparent; outline: none; padding: 0; }
+        .editor-container { flex: 1; padding: 20px; overflow: hidden; position: relative; background: white; }
+        #editor { width: 100%; height: 100%; border: none; resize: none; font-size: 16px; line-height: 1.6; color: var(--text); background: white; outline: none; padding: 0; }
         /* Sidebar structure */
         .main-container {
             position: relative; /* Needed for proper sidebar positioning */
@@ -516,7 +568,7 @@
                         <div id="tabs" class="tabs"></div>
                     </div>
                     <button id="tabScrollRight" class="tab-scroll-btn" title="Scroll right">▶</button>
-                    <button id="toggleSidebarBtn" class="toggle-sidebar-btn" title="Toggle History Panel">≡</button>
+                    <button id="toggleSidebarBtn" class="toggle-sidebar-btn" title="Toggle History Panel">‖</button>
                     <button id="newTabBtn" class="new-tab-btn" title="New Document">+</button>
                 </div>
                 <div class="editor-container">
@@ -637,6 +689,9 @@
                     // Initialize tab scroll buttons and responsive layout
                     this.checkTabsOverflow();
                     this.checkResponsiveLayout();
+                    
+                    // Initialize tab drag-and-drop functionality
+                    this.initTabDragAndDrop();
 
                     this.showStatus('Ready');
                 } catch (err) {
@@ -651,39 +706,7 @@
                     if (this.state.autoSave && this.dom.editor.value !== this.state.saved) this.save();
                 });
 
-                // Add universal event monitoring to diagnose the double-click issue
-                const originalAddEventListener = EventTarget.prototype.addEventListener;
-                EventTarget.prototype.addEventListener = function(type, listener, options) {
-                    // Only monitor dblclick events
-                    if (type === 'dblclick') {
-                        console.log(`Detected dblclick handler added to:`, this);
-
-                        // Add a wrapper to detect when handlers are called
-                        const wrappedListener = function(e) {
-                            console.log(`dblclick event running on:`, e.currentTarget);
-
-                            // If this is a tab title, log it specially
-                            if (e.target.classList.contains('tab-title')) {
-                                console.log(`TAB TITLE EVENT: original listener called for double-click`);
-                            }
-
-                            return listener.apply(this, arguments);
-                        };
-
-                        return originalAddEventListener.call(this, type, wrappedListener, options);
-                    }
-
-                    return originalAddEventListener.call(this, type, listener, options);
-                };
-
-                // Explicitly monitor all double-click events at document level
-                document.addEventListener('dblclick', e => {
-                    console.log(`DIRECT MONITOR: Double-click detected on:`, e.target);
-                    console.log(`Double-click phase: ${e.eventPhase}`);
-                    console.log(`Double-click target is tab-title: ${e.target.classList.contains('tab-title')}`);
-
-                    // Don't interfere, just log
-                }, true);
+                // Global event delegation approach for tab-related events
 
                 // Global event to ensure tab edit inputs get cleaned up when clicking elsewhere in the document
                 document.addEventListener('mousedown', e => {
@@ -774,13 +797,26 @@
                     }
                 }, true); // Use capture phase
 
+                // Function to handle tab focus state
+                this.focusTab = (tab) => {
+                    // Clear all focused tabs first
+                    document.querySelectorAll('.tab.focused').forEach(t => {
+                        t.classList.remove('focused');
+                    });
+                    
+                    // Set this tab as focused
+                    if (tab) {
+                        tab.classList.add('focused');
+                    }
+                };
+
                 // Tab events with event delegation
                 this.dom.tabs.addEventListener('click', e => {
-                    // Don't process tab clicks when in rename mode
-                    if (document.body.classList.contains('tab-renaming')) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        return;
+                    // Allow tab selection even when in rename mode
+                    // Only prevent clicks on the tab being renamed
+                    if (document.body.classList.contains('tab-renaming') && 
+                        e.target.closest('.tab-edit-input')) {
+                        return; // Let the input handle its own events
                     }
 
                     // Delete tab button
@@ -793,12 +829,25 @@
                         }
                         return;
                     }
-
-                    // Tab selection
+                    
+                    // Tab title click - handles title and tab
                     const tab = e.target.closest('.tab');
-                    if (tab) {
+                    if (!tab) return;
+                    
+                    const titleEl = tab.querySelector('.tab-title');
+                    if (!titleEl) return;
+                    
+                    // Check if this tab is already active
+                    if (tab.classList.contains('active')) {
+                        // Second click on active tab - start rename
+                        // Show text cursor immediately for better UX
+                        titleEl.style.cursor = 'text';
+                        this.startTabRename(titleEl);
+                    } else {
+                        // First click - just activate the tab
                         const docId = parseInt(tab.dataset.id);
                         this.switchToDocument(docId);
+                        this.focusTab(tab);
                     }
                 });
 
@@ -818,9 +867,8 @@
                             // Store title element reference
                             const titleEl = title;
 
-                            // Add a right-click handler for more reliable editing
+                            // We still keep right-click for quick access
                             title.addEventListener('contextmenu', (e) => {
-                                if (this.state.debug) console.log('[TabRename] Right-click detected on tab title');
                                 e.preventDefault();
                                 e.stopPropagation();
 
@@ -829,80 +877,167 @@
 
                                 return false; // Prevent default context menu
                             });
-
-                            // Also try direct double-click handler (as a backup)
-                            title.addEventListener('dblclick', (e) => {
-                                if (this.state.debug) console.log('[TabRename] Direct dblclick detected on tab title');
-                                e.preventDefault();
-                                e.stopPropagation();
-
-                                // Process the rename
-                                this.startTabRename(titleEl);
-                            }, true); // true means capture phase
-
-                            // And also try mousedown tracking as a third alternative
-                            let lastClickTime = 0;
-                            title.addEventListener('mousedown', (e) => {
-                                // Only process left button clicks
-                                if (e.button !== 0) return;
-
-                                const now = Date.now();
-                                const timeDiff = now - lastClickTime;
-
-                                if (timeDiff < 500) {
-                                    // This is a double-click (two clicks within 500ms)
-                                    if (this.state.debug) console.log('[TabRename] Manual double-click detection via mousedown timing');
-                                    e.preventDefault();
-                                    e.stopPropagation();
-
-                                    // Reset tracking
-                                    lastClickTime = 0;
-
-                                    // Process rename
-                                    this.startTabRename(titleEl);
-                                } else {
-                                    // First click - record the time
-                                    lastClickTime = now;
-                                }
-                            });
+                            
+                            // No longer need dblclick or mousedown handlers
+                            // Single-click handling is now managed by the tab click handler
                         }
                     });
 
-                    if (this.state.debug) {
-                        console.log(`[TabRename] Set up rename handlers on ${tabTitles.length} tab titles`);
-                    }
+                    // Debug logging removed
+                };
+                
+                // Initialize tab drag-and-drop functionality
+                this.initTabDragAndDrop = () => {
+                    // Target is the tabs container
+                    const tabsContainer = this.dom.tabs;
+                    if (!tabsContainer) return;
+                    
+                    // Variables to track drag state
+                    let draggedTab = null;
+                    let draggedTabIndex = -1;
+                    
+                    // Setup event handlers
+                    tabsContainer.addEventListener('dragstart', (e) => {
+                        // Only allow drag from actual tabs (not other elements)
+                        const tab = e.target.closest('.tab');
+                        if (!tab) return;
+                        
+                        // Stop drag if clicking delete button
+                        if (e.target.closest('.tab-delete')) {
+                            e.preventDefault();
+                            return;
+                        }
+                        
+                        // Set drag data and track the dragged tab
+                        const docId = parseInt(tab.dataset.id);
+                        e.dataTransfer.setData('text/plain', docId);
+                        e.dataTransfer.effectAllowed = 'move';
+                        
+                        // Make the tab semi-transparent during drag
+                        tab.classList.add('dragging');
+                        tab.style.opacity = '0.7';
+                        
+                        // Store reference to dragged tab and its index
+                        draggedTab = tab;
+                        draggedTabIndex = this.state.openDocs.findIndex(doc => doc.id === docId);
+                    });
+                    
+                    // Handle the dragover event to indicate where to drop
+                    tabsContainer.addEventListener('dragover', (e) => {
+                        e.preventDefault(); // Necessary to allow dropping
+                        e.dataTransfer.dropEffect = 'move';
+                        
+                        // Find the tab being dragged over
+                        const targetTab = e.target.closest('.tab');
+                        if (!targetTab || targetTab === draggedTab) return;
+                        
+                        // Visual feedback - add a subtle highlight to the target
+                        document.querySelectorAll('.tab-drop-target').forEach(tab => {
+                            tab.classList.remove('tab-drop-target');
+                        });
+                        targetTab.classList.add('tab-drop-target');
+                    });
+                    
+                    // Handle the drop event to reorder tabs
+                    tabsContainer.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        
+                        // Clear drop target highlights
+                        document.querySelectorAll('.tab-drop-target').forEach(tab => {
+                            tab.classList.remove('tab-drop-target');
+                        });
+                        
+                        // Find the tab we're dropping onto
+                        const targetTab = e.target.closest('.tab');
+                        if (!targetTab || targetTab === draggedTab) return;
+                        
+                        // Get the target tab's document ID and index
+                        const targetDocId = parseInt(targetTab.dataset.id);
+                        const targetIndex = this.state.openDocs.findIndex(doc => doc.id === targetDocId);
+                        
+                        // Move the tab in our data structure
+                        if (targetIndex !== -1 && draggedTabIndex !== -1 && targetIndex !== draggedTabIndex) {
+                            // Get the dragged doc
+                            const draggedDoc = this.state.openDocs[draggedTabIndex];
+                            
+                            // Remove it from its original position
+                            this.state.openDocs.splice(draggedTabIndex, 1);
+                            
+                            // Insert it at the new position
+                            this.state.openDocs.splice(targetIndex, 0, draggedDoc);
+                            
+                            // Adjust the active tab index if needed
+                            if (this.state.activeTabIndex === draggedTabIndex) {
+                                this.state.activeTabIndex = targetIndex;
+                            } else if (
+                                (draggedTabIndex < this.state.activeTabIndex && targetIndex >= this.state.activeTabIndex) ||
+                                (draggedTabIndex > this.state.activeTabIndex && targetIndex <= this.state.activeTabIndex)
+                            ) {
+                                // The active tab's position is affected by the move
+                                this.state.activeTabIndex += (draggedTabIndex < targetIndex) ? -1 : 1;
+                            }
+                            
+                            // Update the UI
+                            this.updateTabs();
+                            
+                            // Save the new order to persistence
+                            this.saveAppState();
+                        }
+                    });
+                    
+                    // Clean up after drag completes
+                    tabsContainer.addEventListener('dragend', (e) => {
+                        if (draggedTab) {
+                            draggedTab.classList.remove('dragging');
+                            draggedTab.style.opacity = '';
+                            draggedTab = null;
+                            draggedTabIndex = -1;
+                            
+                            // Remove any drop target highlights
+                            document.querySelectorAll('.tab-drop-target').forEach(tab => {
+                                tab.classList.remove('tab-drop-target');
+                            });
+                        }
+                    });
+                    
+                    // Also clean up on dragleave
+                    tabsContainer.addEventListener('dragleave', (e) => {
+                        // Check if we're leaving the tabs container completely
+                        const relatedTarget = e.relatedTarget;
+                        if (!relatedTarget || !tabsContainer.contains(relatedTarget)) {
+                            document.querySelectorAll('.tab-drop-target').forEach(tab => {
+                                tab.classList.remove('tab-drop-target');
+                            });
+                        }
+                    });
                 };
 
                 // Actual tab rename function, extracted for reuse
                 this.startTabRename = (titleEl) => {
-                    if (this.state.debug) {
-                        console.log('[TabRename] Starting rename for', titleEl.textContent);
-                    }
 
                     // Get parent tab
                     const tab = titleEl.closest('.tab');
                     if (!tab) {
-                        if (this.state.debug) console.log('[TabRename] No tab found for title element');
+                        return;
+                    }
+
+                    // Check if this is the active tab
+                    if (!tab.classList.contains('active')) {
                         return;
                     }
                     
-                    // Check if this is the active tab
-                    if (!tab.classList.contains('active')) {
-                        if (this.state.debug) console.log('[TabRename] Tab is not active, ignoring rename');
-                        return;
-                    }
+                    // We no longer need to check for focused state
+                    // Simply proceed with rename if tab is active
 
                     // Get document ID
                     const docId = parseInt(tab.dataset.id);
                     if (!docId) {
-                        if (this.state.debug) console.log('[TabRename] No valid docId found');
                         return;
                     }
 
                     // Get current title
                     const docIndex = this.state.openDocs.findIndex(doc => doc.id === docId);
                     if (docIndex === -1) {
-                        if (this.state.debug) console.log('[TabRename] Document not found in openDocs');
                         return;
                     }
 
@@ -919,7 +1054,7 @@
                     input.className = 'tab-edit-input';
                     input.value = currentTitle;
                     input.id = 'tab-edit-input-' + Date.now(); // Unique ID to find it easily
-                    
+
                     // Add attributes to help with focus
                     input.setAttribute('autofocus', 'autofocus');
                     input.setAttribute('tabindex', '1');
@@ -943,35 +1078,33 @@
                     // Key handler with custom focus flag
                     input.customFocused = false; // Track focus state manually
                     let isComposing = false; // Track IME composition state
-                    
+
                     // Draw attention to the input visually to help user with signature color
-                    input.style.backgroundColor = 'rgba(255, 179, 0, 0.1)'; // Signature color with low opacity
+                    input.style.backgroundColor = 'white'; // Start with solid white for complete coverage
                     input.style.borderBottom = '2px solid var(--signature-color)';
-                    
+                    input.style.boxShadow = '0 0 0 1px rgba(255, 179, 0, 0.3)'; // Subtle glow effect
+
                     // Track IME composition start
                     input.addEventListener('compositionstart', () => {
                         isComposing = true;
-                        if (this.state.debug) console.log('[TabRename] IME composition started');
                     });
-                    
+
                     // Track IME composition end
                     input.addEventListener('compositionend', () => {
                         isComposing = false;
-                        if (this.state.debug) console.log('[TabRename] IME composition ended');
                     });
-                    
+
                     input.addEventListener('keydown', (e) => {
                         // Mark as having received focus via keyboard
                         input.customFocused = true;
-                        input.style.backgroundColor = 'var(--pantone-white)'; // Change to theme white
-                        
+                        input.style.backgroundColor = 'white'; // Keep solid white background
+
                         if (e.key === 'Enter') {
                             // Don't handle Enter during IME composition
                             if (isComposing) {
-                                if (this.state.debug) console.log('[TabRename] Ignored Enter during IME composition');
                                 return; // Let the IME handle it
                             }
-                            
+
                             e.preventDefault();
                             e.stopPropagation();
                             saveRename(input.value);
@@ -985,46 +1118,57 @@
 
                     // Blur handler with checks to prevent double removal
                     let inputRemoved = false;
-                    
+
                     const removeInputSafely = () => {
                         if (!inputRemoved && input.parentNode) {
+                            // First store the parent tab - we need this before removing the input
+                            const parentTab = input.parentNode;
+                            
+                            // Now remove the input
                             input.parentNode.removeChild(input);
                             inputRemoved = true;
                             document.body.classList.remove('tab-renaming');
+                            
+                            // Make the title visible again and reset cursor
+                            titleEl.style.visibility = 'visible';
+                            titleEl.style.cursor = 'pointer';
                         }
                     };
-                    
+
                     input.addEventListener('blur', () => {
                         // First save any changes
                         saveRename(input.value);
-                        
+
                         // Use setTimeout to allow other handlers to complete first
                         setTimeout(removeInputSafely, 0);
                     });
 
                     // Add to DOM - in-place editing
                     tab.appendChild(input);
-
+                    
+                    // Hide the tab title while editing for a cleaner appearance
+                    titleEl.style.visibility = 'hidden';
+                    
                     // Enter renaming mode
                     document.body.classList.add('tab-renaming');
-                    
+
                     // Add a document-level key handler as a fallback
                     let docIsComposing = false; // Track IME composition at document level
-                    
+
                     // Handle composition events at document level
                     document.addEventListener('compositionstart', () => {
                         docIsComposing = true;
                         if (this.state.debug) console.log('[TabRename] Document level IME composition started');
                     });
-                    
+
                     document.addEventListener('compositionend', () => {
                         docIsComposing = false;
                         if (this.state.debug) console.log('[TabRename] Document level IME composition ended');
                     });
-                    
+
                     const documentKeyHandler = function(e) {
                         const renameInput = document.querySelector('.tab-edit-input');
-                        
+
                         // Only handle keys if input exists and hasn't been directly focused
                         if (renameInput && !renameInput.customFocused) {
                             // Don't interfere with IME composition
@@ -1032,7 +1176,7 @@
                                 if (this.state.debug) console.log('[TabRename] Ignored document Enter during IME composition');
                                 return; // Let the IME handle it
                             }
-                            
+
                             // Clear initial value on first keypress (better UX)
                             if (e.key.length === 1 && renameInput.value === currentTitle) {
                                 renameInput.value = e.key;
@@ -1040,7 +1184,7 @@
                                 e.preventDefault();
                                 return;
                             }
-                            
+
                             // Type character into input
                             if (e.key.length === 1) {
                                 renameInput.value += e.key;
@@ -1075,11 +1219,11 @@
                             }
                         }
                     };
-                    
+
                     // Add and remove document key handlers for both keypress and keydown
                     document.addEventListener('keypress', documentKeyHandler);
                     document.addEventListener('keydown', documentKeyHandler);
-                    
+
                     // Clean up document key handlers when input is removed
                     input.addEventListener('blur', function() {
                         document.removeEventListener('keypress', documentKeyHandler);
@@ -1091,9 +1235,9 @@
                         try {
                             // Skip if input was removed
                             if (!input.parentNode) return;
-                            
+
                             if (this.state.debug) console.log('[TabRename] Attempting to focus input');
-                            
+
                             // Temporarily stop all click events
                             const stopEvents = (e) => {
                                 // Only let through events on our input
@@ -1103,25 +1247,25 @@
                                     return false;
                                 }
                             };
-                            
+
                             // Add event blockers
                             document.addEventListener('mousedown', stopEvents, true);
                             document.addEventListener('click', stopEvents, true);
-                            
+
                             // Focus without any other UI events interfering
                             input.focus();
                             input.select();
-                            
+
                             // Verify focus
                             const focusSuccess = document.activeElement === input;
                             if (this.state.debug) console.log('[TabRename] Input focused?', focusSuccess);
-                            
+
                             // Remove event blockers after a short delay
                             setTimeout(() => {
                                 document.removeEventListener('mousedown', stopEvents, true);
                                 document.removeEventListener('click', stopEvents, true);
                             }, 200);
-                            
+
                         } catch (e) {
                             console.error('[TabRename] Focus error:', e);
                         }
@@ -1137,13 +1281,12 @@
                 // Set up handlers on initial tabs
                 this.setupTabRenameHandlers();
 
-                // Update the setupTabRenameHandlers to run after tab updates
+                // Update the setupTabRenameHandlers to run immediately after tab updates
                 const originalUpdateTabs = this.updateTabs;
                 this.updateTabs = function() {
                     originalUpdateTabs.apply(this, arguments);
-                    setTimeout(() => {
-                        this.setupTabRenameHandlers();
-                    }, 10);
+                    // Call setupTabRenameHandlers synchronously to ensure handlers are ready immediately
+                    this.setupTabRenameHandlers();
                 };
             },
 
@@ -1523,7 +1666,7 @@
                         if (this.state.debug) {
                             console.log(`[loadRevHistory] Sidebar collapsed state: ${sidebarCollapsed}`);
                         }
-                        
+
                         if (!sidebarCollapsed) {
                             this.dom.historyList.innerHTML = '<li class="history-item">No revisions yet</li>';
                         } else {
@@ -1696,8 +1839,8 @@
                 const tabsHtml = this.state.openDocs.map((doc, index) => {
                     const isActive = index === this.state.activeTabIndex;
                     return `
-                        <div class="tab ${isActive ? 'active' : ''}" data-id="${doc.id}">
-                            <span class="tab-title" title="Double-click to rename '${this.escapeHtml(doc.title)}'">${this.escapeHtml(doc.title)}</span>
+                        <div class="tab ${isActive ? 'active' : ''}" data-id="${doc.id}" draggable="true">
+                            <span class="tab-title" title="Click twice to rename '${this.escapeHtml(doc.title)}'">${this.escapeHtml(doc.title)}</span>
                             <span class="tab-delete" title="Close document">×</span>
                         </div>
                     `;
@@ -1897,7 +2040,7 @@
                 } catch (err) {
                     console.error('Save sidebar state error:', err);
                 }
-                
+
                 // Refresh the revision history list to ensure "No revisions yet" message is properly updated
                 // This will clear the message when collapsed and show it when expanded
                 await this.loadRevHistory();
@@ -1985,7 +2128,7 @@
                     }
 
                     // Removed history view state loading - using only sidebar toggle now
-                    
+
                     // Refresh the revision history to ensure proper display based on sidebar state
                     // This will ensure "No revisions yet" message is properly hidden when sidebar is collapsed
                     await this.loadRevHistory();

@@ -11,16 +11,33 @@
       padding: 10px;
       margin: 0;
     }
-    button, textarea {
+    textarea {
       width: 100%;
       box-sizing: border-box;
-      margin-top: 10px;
-      font-size: 16px;
-    }
-    textarea {
+      margin-bottom: 10px;
       height: 150px;
       font-family: monospace;
       resize: vertical;
+      font-size: 16px;
+    }
+    /* Container for the buttons */
+    .button-container {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+    button {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      border: none;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 0;
     }
     /* Hide the default file input */
     #fileInput {
@@ -32,12 +49,16 @@
   <!-- Hidden file input for loading files -->
   <input type="file" id="fileInput" accept=".html">
 
-  <!-- UI Buttons and Code Area -->
-  <button id="loadButton">Load</button>
-  <button id="clearButton">Clear</button>
-  <button id="pasteButton">Paste</button>
+  <!-- Code Preview Area -->
   <textarea id="sourceArea" placeholder="paste the code here or load the html file"></textarea>
-  <button id="viewButton">View</button>
+
+  <!-- UI Buttons -->
+  <div class="button-container">
+    <button id="loadButton">Load</button>
+    <button id="clearButton">Clear</button>
+    <button id="pasteButton">Paste</button>
+    <button id="viewButton">View</button>
+  </div>
 
   <script>
     // Function to open the HTML content in a new tab using a Blob URL.
