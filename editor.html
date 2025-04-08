@@ -705,6 +705,28 @@
                 this.dom.editor.addEventListener('blur', () => {
                     if (this.state.autoSave && this.dom.editor.value !== this.state.saved) this.save();
                 });
+                
+                // Handle Tab key in the editor to insert 3 spaces instead of tab character
+                this.dom.editor.addEventListener('keydown', (e) => {
+                    if (e.key === 'Tab') {
+                        e.preventDefault(); // Prevent default tab behavior
+                        
+                        // Get cursor position
+                        const start = this.dom.editor.selectionStart;
+                        const end = this.dom.editor.selectionEnd;
+                        
+                        // Insert 3 spaces at cursor position
+                        this.dom.editor.value = this.dom.editor.value.substring(0, start) 
+                                             + '   ' // 3 spaces
+                                             + this.dom.editor.value.substring(end);
+                        
+                        // Move cursor after inserted spaces
+                        this.dom.editor.selectionStart = this.dom.editor.selectionEnd = start + 3;
+                        
+                        // Trigger input event to handle auto-save
+                        this.handleInput();
+                    }
+                });
 
                 // Global event delegation approach for tab-related events
 

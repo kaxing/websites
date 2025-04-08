@@ -10,15 +10,31 @@
       font-family: sans-serif;
       padding: 10px;
       margin: 0;
+      display: flex;
+      justify-content: center;
+      background: #f4f4f4;
+    }
+    /* Main container for the viewer */
+    .viewer-container {
+      width: 100%;
+      max-width: 800px;
+      background: #fff;
+      padding: 20px;
+      box-sizing: border-box;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      border-radius: 8px;
     }
     textarea {
       width: 100%;
       box-sizing: border-box;
-      margin-bottom: 10px;
-      height: 150px;
+      margin-bottom: 15px;
+      height: 300px; /* Made taller */
       font-family: monospace;
       resize: vertical;
       font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 10px;
     }
     /* Container for the buttons */
     .button-container {
@@ -37,27 +53,43 @@
       align-items: center;
       justify-content: center;
       text-align: center;
-      padding: 0;
+      /* No explicit background or color styling so default colors remain */
     }
     /* Hide the default file input */
     #fileInput {
       display: none;
     }
+    /* Responsive adjustments */
+    @media (max-width: 480px) {
+      .viewer-container {
+        padding: 15px;
+      }
+      textarea {
+        font-size: 14px;
+      }
+      button {
+        width: 50px;
+        height: 50px;
+        font-size: 10px;
+      }
+    }
   </style>
 </head>
 <body>
-  <!-- Hidden file input for loading files -->
-  <input type="file" id="fileInput" accept=".html">
+  <div class="viewer-container">
+    <!-- Hidden file input for loading files -->
+    <input type="file" id="fileInput" accept=".html">
 
-  <!-- Code Preview Area -->
-  <textarea id="sourceArea" placeholder="paste the code here or load the html file"></textarea>
+    <!-- Code Preview Area -->
+    <textarea id="sourceArea" placeholder="Paste the code here or load the HTML file"></textarea>
 
-  <!-- UI Buttons -->
-  <div class="button-container">
-    <button id="loadButton">Load</button>
-    <button id="clearButton">Clear</button>
-    <button id="pasteButton">Paste</button>
-    <button id="viewButton">View</button>
+    <!-- UI Buttons -->
+    <div class="button-container">
+      <button id="loadButton">Load</button>
+      <button id="clearButton">Clear</button>
+      <button id="pasteButton">Paste</button>
+      <button id="viewButton">View</button>
+    </div>
   </div>
 
   <script>
